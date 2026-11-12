@@ -166,9 +166,22 @@ const GameState = {
         }
     },
 
-    // 魚1匹あたりの売値（スキル補正込み）
+    // 魚1匹あたりの売値（スキル・海域・コンボ補正込み）
     getSalePrice(fish) {
-        return Math.floor(fish.price * (1 + this.getPriceBonus()));
+        return Math.floor(fish.price * (1 + this.getPriceBonus()) * (1 + this.getComboBonus()));
+    },
+
+    // 連続成功コンボによる売値ボーナス（0.1 = +10%）
+    getComboBonus() {
+        if (!this.run) return 0;
+        const cfg = GAME_DATA.ROGUE_CONFIG.combo;
+        return Math.min(this.run.combo || 0, cfg.maxStacks) * cfg.step;
+    },
+
+    // 今いる海域（ラウンド中のみ）
+    getCurrentArea() {
+        if (!this.run || !this.run.area) return null;
+        return GAME_DATA.ROGUE_CONFIG.areas.find(a => a.id === this.run.area) || null;
     },
 
     // ========================================
@@ -220,11 +233,10 @@ const GameState = {
 
     // ========================================
     // 釣り竿（購入・強化）
-    // 価格は原作の値に ROGUE_CONFIG.costMult を掛けたもの
+    // 価格は ROGUE_CONFIG.rodPrices / rodUpgradeCosts
     // ========================================
     getRodPrice(rodIndex) {
-        const rod = GAME_DATA.RODS[rodIndex];
-        const base = rod.price * GAME_DATA.ROGUE_CONFIG.costMult.rod;
+        const base = GAME_DATA.ROGUE_CONFIG.rodPrices[rodIndex];
         return Math.floor(base * (1.0 - this.getShopDiscount()));
     },
 
@@ -242,7 +254,7 @@ const GameState = {
 
     getUpgradeCost() {
         if (this.rodStars >= 5) return null;
-        const base = this.getCurrentRod().upgradeCosts[this.rodStars] * GAME_DATA.ROGUE_CONFIG.costMult.upgrade;
+        const base = GAME_DATA.ROGUE_CONFIG.rodUpgradeCosts[this.rodRankIndex][this.rodStars];
         return Math.floor(base * this.getUpgradeCostModifier());
     },
 
@@ -609,7 +621,7 @@ const GameState = {
         this.getEffectsByType('bait_save').forEach(effect => {
             chance += effect.value;
         });
-        return Math.min(chance, 1.0); // 最大100%
+        return Math.min(chance, GAME_DATA.ROGUE_CONFIG.caps.baitSave);
     },
 
     // ========================================
@@ -861,7 +873,7 @@ const GameState = {
         this.getEffectsByType('multi_catch_prob').forEach(effect => {
             chance += effect.value;
         });
-        return Math.min(chance, 1.0);
+        return Math.min(chance, GAME_DATA.ROGUE_CONFIG.caps.multiCatch2);
     },
 
     // ========================================
@@ -872,7 +884,7 @@ const GameState = {
         this.getEffectsByType('multi_catch_3').forEach(effect => {
             chance += effect.value;
         });
-        return Math.min(chance, 1.0);
+        return Math.min(chance, GAME_DATA.ROGUE_CONFIG.caps.multiCatch3);
     },
 
     // ========================================
@@ -995,6 +1007,11 @@ const GameState = {
             if (!skill) continue;
 
             this._collectEffects(skill.effect, type, effects);
+        }
+        // 海域の効果は「その海域にいる間だけ装備される見えないスキル」として混ぜる
+        const area = this.getCurrentArea();
+        if (area) {
+            area.effects.forEach(effect => this._collectEffects(effect, type, effects));
         }
         return effects;
     },

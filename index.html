@@ -63,23 +63,23 @@
             <div class="cloud cloud3"></div>
         </div>
 
-        <!-- フローティングステータス（左側）: 所持金・パワー・ラウンド目標 -->
-        <div class="floating-status floating-status-left">
-            <div class="status-pill">
-                <span class="status-icon"><span class="material-icons">paid</span></span>
-                <span id="money-display" class="status-value">0 G</span>
-            </div>
-            <div class="status-pill">
-                <span class="status-icon"><span class="material-icons">phishing</span></span>
-                <span id="power-display" class="status-value">10</span>
-            </div>
-
-            <div id="run-panel" class="mission-display rg-run-panel">
-                <div id="round-label" class="mission-label">ROUND 1</div>
-                <div class="rg-progress">
+        <!-- 上部バー: 判断に使う数字を1か所に集める -->
+        <div class="rg-hud-top">
+            <div class="rg-topbar">
+                <span id="round-label" class="rg-round">R1</span>
+                <div class="rg-progress" id="round-progress">
                     <div id="round-progress-bar" class="rg-progress-fill"></div>
+                    <div id="round-mark-silver" class="rg-mark rg-mark-silver hidden"></div>
+                    <div id="round-mark-gold" class="rg-mark rg-mark-gold hidden"></div>
                 </div>
-                <div id="round-progress-text" class="mission-text">0 / 0 G</div>
+                <span id="round-progress-text" class="rg-progress-text">0/0</span>
+                <span class="rg-money"><span id="money-display">0 G</span></span>
+            </div>
+            <div class="rg-chips">
+                <span class="rg-chip"><span class="material-icons">phishing</span><span id="power-display">10 P</span></span>
+                <span id="combo-chip" class="rg-chip rg-chip-combo hidden"></span>
+                <span id="area-chip" class="rg-chip"></span>
+                <button id="help-btn" class="rg-chip rg-chip-btn" aria-label="ヘルプ"><span class="material-icons">help_outline</span></button>
             </div>
         </div>
 
@@ -96,29 +96,20 @@
             <div class="rod-line"></div>
         </div>
 
-        <!-- 右上ステータス (Help) -->
-        <div class="floating-status floating-status-right">
-            <button id="help-btn" class="floating-btn btn-help">
-                <span class="material-icons">help_outline</span>
-            </button>
-        </div>
-
-
-
-        <!-- 中央下部HUD（装備・餌・竿） -->
-        <div class="bottom-hud-center">
-            <!-- 装備確認ボタン -->
-            <button id="build-btn" class="floating-btn btn-town">
-                <span class="material-icons">backpack</span>
-                <span class="btn-label">装備</span>
-            </button>
-            <!-- 餌情報 -->
-            <div id="bait-status-display" class="bait-status-large">
-                <div id="bait-info" class="bait-value"></div>
+        <!-- 下部HUD: 操作（装備・帰港・餌の選択）を親指の届く場所に -->
+        <div class="bottom-hud-center rg-hud-bottom">
+            <div class="rg-hud-actions">
+                <button id="build-btn" class="floating-btn btn-town rg-small-btn">
+                    <span class="material-icons">backpack</span>
+                    <span class="btn-label">装備</span>
+                </button>
                 <div id="bait-total" class="rg-bait-total"></div>
+                <button id="return-btn" class="floating-btn btn-town rg-small-btn rg-return-btn hidden">
+                    <span class="material-icons">anchor</span>
+                    <span class="btn-label">帰港</span>
+                </button>
             </div>
-            <!-- 装備中の竿 -->
-            <div id="rod-info" class="rod-badge"></div>
+            <div id="bait-info" class="rg-bait-slots"></div>
         </div>
     </div>
 
@@ -164,9 +155,11 @@
                     <h3>⛵ 航海のルール</h3>
                     <ul class="help-simple-list">
                         <li><strong>目標:</strong> 各ラウンドで、釣った魚の水揚げ額を目標額まで稼ぎます。釣った魚は自動で売却されます。</li>
-                        <li><strong>餌:</strong> 一投ごとに餌を1つ使います（釣れなくても減ります）。毎ラウンド基本の餌が支給されます。</li>
+                        <li><strong>餌:</strong> 一投ごとに餌を1つ使います（釣れなくても減ります）。毎ラウンド10個支給され、ラウンドが進むと支給される餌のランクが上がります。</li>
                         <li><strong>ゲームオーバー:</strong> 目標に届かないまま餌がすべて尽きると航海は終わりです。</li>
-                        <li><strong>クリア:</strong> 目標に届いた時点でラウンドクリア。余った基本の餌はボーナスになります。</li>
+                        <li><strong>帰港と評価:</strong> 目標に届いたら、いつでも「帰港」できます。粘って目標の1.5倍で「銀」、2倍で「金」になり、報酬が良くなります。餌が尽きると自動で帰港します。</li>
+                        <li><strong>コンボ:</strong> 続けて釣り上げるたびに売値+10%（最大+50%）。失敗すると途切れます。</li>
+                        <li><strong>海域:</strong> 港を出るときに2つの海域から1つを選びます。海域ごとに目標額と効果が変わります。</li>
                     </ul>
                 </div>
 
@@ -201,21 +194,12 @@
             </div>
         </header>
 
-        <div id="harbor-tabs" class="shop-tabs">
-            <button class="shop-tab active" data-tab="shop">ショップ</button>
-            <button class="shop-tab" data-tab="loadout">装備 <span id="harbor-loadout-count"></span></button>
-        </div>
-
         <main class="shop-content">
             <div id="harbor-main"></div>
         </main>
 
         <footer class="shop-footer rg-harbor-footer">
             <div id="harbor-next" class="rg-next-info"></div>
-            <button id="depart-btn" class="btn-main">
-                <span class="material-icons">sailing</span>
-                出航
-            </button>
         </footer>
     </div>
 

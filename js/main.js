@@ -40,15 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     on('build-btn', () => HarborUI.showBuild());
+    on('return-btn', () => RunManager.returnToHarbor());
     on('help-btn', () => UIManager.openHelp());
 
-    // ========================================
-    // 港画面
-    // ========================================
-    document.querySelectorAll('#harbor-tabs .shop-tab').forEach(tab => {
-        tab.addEventListener('click', () => HarborUI.setTab(tab.dataset.tab));
-    });
-    on('depart-btn', () => HarborUI.onDepart());
 
     // ========================================
     // キーボード（スペースキーでタップの代わり）

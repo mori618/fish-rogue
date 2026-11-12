@@ -6,7 +6,7 @@
 const SaveManager = {
     RUN_KEY: 'fish_rogue_run',
     META_KEY: 'fish_rogue_meta',
-    VERSION: 1,
+    VERSION: 2,
 
     // ========================================
     // 航海データ

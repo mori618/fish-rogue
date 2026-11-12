@@ -1,9 +1,10 @@
 // 港（ラウンド間）画面と、航海まわりのモーダルの描画
 // 状態の変更はすべて RunManager 経由で行い、ここは表示と入力の受け渡しだけを担当する。
+//
+// 港は1画面: 上に常時表示のビルド帯、その下に「結果と報酬3択」→「ショップ」、
+// フッターの海域カードがそのまま出航ボタンになる。
 
 const HarborUI = {
-    tab: 'shop',  // 'shop' | 'loadout'
-
     TIER_LABELS: { 0: '特別', 1: 'I', 2: 'II', 3: 'III', 4: '極' },
 
     // ========================================
@@ -15,42 +16,64 @@ const HarborUI = {
         if (!main || !run || !run.harbor) return;
 
         const harbor = run.harbor;
-        document.getElementById('harbor-title').textContent = `港 ― ラウンド${run.round} クリア`;
+        document.getElementById('harbor-title').textContent = `港 ― R${run.round} クリア`;
         UIManager.updateMoney();
 
-        const tabs = document.getElementById('harbor-tabs');
-        const departBtn = document.getElementById('depart-btn');
+        main.innerHTML = this.buildHtml() + (harbor.rewardTaken
+            ? this.shopHtml(harbor)
+            : this.summaryHtml(harbor.summary) + this.rewardHtml(harbor));
 
-        if (!harbor.rewardTaken) {
-            // まず報酬スキルを選ぶ（選ぶまで買い物・出航はできない）
-            tabs.classList.add('hidden');
-            departBtn.disabled = true;
-            main.innerHTML = this.summaryHtml(harbor.summary) + this.rewardHtml(harbor);
-        } else {
-            tabs.classList.remove('hidden');
-            departBtn.disabled = false;
-            tabs.querySelectorAll('.shop-tab').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.tab === this.tab);
-            });
-            document.getElementById('harbor-loadout-count').textContent =
-                `${GameState.equippedSkills.length}/${GameState.getSkillSlots()}`;
-            main.innerHTML = this.tab === 'shop' ? this.shopHtml(harbor) : this.loadoutHtml();
-        }
+        document.getElementById('harbor-next').innerHTML = this.areaHtml(harbor);
+    },
 
-        const nextRound = run.round + 1;
-        const nextBait = GameState.getTotalBaitCount() + RunManager.config.baitPerRound;
-        document.getElementById('harbor-next').innerHTML = `
-            <span class="rg-next-label">次 ROUND ${nextRound}</span>
-            <span class="rg-next-value">目標 ${RunManager.getTarget(nextRound).toLocaleString()} G ／ 餌 ${nextBait}個</span>
+    // ----------------------------------------
+    // ビルド帯（竿・パワー・スキル。アイコンをタップで詳細）
+    // ----------------------------------------
+    buildHtml() {
+        const rod = GameState.getCurrentRod();
+        const slots = GameState.getSkillSlots();
+        const equipped = GameState.equippedSkills;
+
+        const icon = (id, extra = '') => {
+            const skill = GameState.getSkillData(id);
+            return `<button class="rg-skill-chip rg-tier-${skill.tier} ${extra}" onclick="HarborUI.showSkill('${id}', ${extra ? 'false' : 'true'})" title="${skill.name}">
+                <span class="material-icons">${skill.icon || 'auto_fix_high'}</span>
+            </button>`;
+        };
+
+        const equippedIcons = equipped.map(id => icon(id)).join('');
+        const emptyIcons = Array.from({ length: Math.max(0, slots - equipped.length) },
+            () => `<span class="rg-skill-chip rg-empty"></span>`).join('');
+
+        // 装備していない分（所持数 − 装備数）を控えとして並べる
+        const benchIds = [];
+        Object.keys(GameState.skillInventory).forEach(id => {
+            const spare = GameState.getSkillCount(id) - GameState.getEquippedSkillCount(id);
+            for (let i = 0; i < spare; i++) benchIds.push(id);
+        });
+        const bench = benchIds.length
+            ? `<div class="rg-bench"><span class="rg-bench-label">控え</span>${benchIds.map(id => icon(id, 'rg-benched')).join('')}</div>`
+            : '';
+
+        return `
+            <section class="rg-build">
+                <div class="rg-build-head">
+                    <span>${rod.name} <span class="rg-stars">${'★'.repeat(GameState.rodStars)}</span></span>
+                    <span>パワー <strong>${GameState.getTotalPower()}</strong></span>
+                    <span>スロット ${equipped.length}/${slots}</span>
+                </div>
+                <div class="rg-skill-row">${equippedIcons}${emptyIcons}</div>
+                ${bench}
+            </section>
         `;
     },
 
-    setTab(tab) {
-        this.tab = tab;
-        this.render();
-    },
-
+    // ----------------------------------------
+    // ラウンド結果と報酬3択
+    // ----------------------------------------
     summaryHtml(summary) {
+        const grade = GAME_DATA.ROGUE_CONFIG.grades.find(g => g.id === summary.grade);
+        const gradeNote = { gold: '報酬4択・Tier1段階上・入れ替え1回無料', silver: '報酬4択', bronze: '' }[grade.id];
         const banner = summary.isFinalClear
             ? `<div class="rg-banner"><span class="material-icons">emoji_events</span> 航海達成！ ここから先はエンドレスです</div>`
             : '';
@@ -58,9 +81,10 @@ const HarborUI = {
         return `
             ${banner}
             <div class="rg-summary">
+                <div class="rg-summary-row"><span>評価</span><strong class="rg-grade rg-grade-${grade.id}">${grade.name}${gradeNote ? `<small>${gradeNote}</small>` : ''}</strong></div>
                 <div class="rg-summary-row"><span>水揚げ</span><strong>${summary.earned.toLocaleString()} / ${summary.target.toLocaleString()} G</strong></div>
                 <div class="rg-summary-row"><span>クリアボーナス</span><strong class="rg-plus">+${summary.clearBonus.toLocaleString()} G</strong></div>
-                <div class="rg-summary-row"><span>余った基本の餌 ×${summary.leftover}</span><strong class="rg-plus">+${summary.leftoverBonus.toLocaleString()} G</strong></div>
+                <div class="rg-summary-row"><span>余った支給餌 ×${summary.leftover}</span><strong class="rg-plus">+${summary.leftoverBonus.toLocaleString()} G</strong></div>
             </div>
         `;
     },
@@ -80,7 +104,7 @@ const HarborUI = {
 
         return `
             <h3 class="rg-section-title"><span class="material-icons">redeem</span> 報酬スキルを1つ選ぶ</h3>
-            <div class="rg-reward-list">${cards}</div>
+            <div class="rg-reward-list rg-count-${harbor.rewardOptions.length}">${cards}</div>
             <button class="btn-nav rg-skip-btn" onclick="HarborUI.onSkipReward()">
                 受け取らずに +${RunManager.getRewardSkipBonus().toLocaleString()} G もらう
             </button>
@@ -88,152 +112,128 @@ const HarborUI = {
     },
 
     // ----------------------------------------
-    // ショップタブ: スキル・餌・竿
+    // ショップ（スキル・餌・竿を1画面に）
     // ----------------------------------------
     shopHtml(harbor) {
         const money = GameState.money;
 
-        const skillRows = harbor.shopSkills.map((offer, index) => {
+        const skillCards = harbor.shopSkills.map((offer, index) => {
+            const skill = GameState.getSkillData(offer.id);
             const price = RunManager.getSkillPrice(offer.id);
-            const action = offer.sold
-                ? `<span class="rg-sold">売り切れ</span>`
-                : this.buyButton(price, money, `HarborUI.onBuySkill(${index})`);
-            return this.skillRow(offer.id, action, offer.sold ? 'locked' : '');
+            return `
+                <button class="rg-card rg-skill-card rg-tier-${skill.tier} ${offer.sold ? 'sold' : ''}"
+                    onclick="HarborUI.onBuySkill(${index})" ${offer.sold ? 'disabled' : ''}>
+                    <span class="rg-card-top">
+                        <span class="material-icons rg-skill-icon">${skill.icon || 'auto_fix_high'}</span>
+                        <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span>
+                    </span>
+                    <span class="rg-card-name">${skill.name}</span>
+                    <span class="rg-card-desc">${skill.description}</span>
+                    ${offer.sold ? '<span class="rg-price">購入済み</span>' : this.priceHtml(price, money)}
+                </button>
+            `;
         }).join('');
 
         const rerollCost = RunManager.getRerollCost();
-        const rerollBtn = `
-            <button class="btn rg-reroll-btn ${money < rerollCost ? 'disabled' : ''}" onclick="HarborUI.onReroll()">
-                <span class="material-icons">refresh</span> 入れ替え ${rerollCost.toLocaleString()} G
-            </button>
-        `;
+        const rerollLabel = rerollCost === 0 ? '無料' : `${rerollCost.toLocaleString()} G`;
 
-        const baitRows = RunManager.getBaitOffers().map(item => {
+        const power = GameState.getTotalPower();
+        const offers = RunManager.getBaitOffers();
+        const baitTiles = GAME_DATA.ROGUE_CONFIG.baitShop.map(item => {
             const bait = GAME_DATA.BAITS.find(b => b.id === item.id);
-            const action = item.stock <= 0
-                ? `<span class="rg-sold">売り切れ</span>`
-                : this.buyButton(item.price, money, `HarborUI.onBuyBait('${item.id}')`);
-            return `
-                <div class="shop-item ${item.stock <= 0 ? 'locked' : ''}">
+            const offer = offers.find(o => o.id === item.id);
+            if (!offer) {
+                return `<div class="rg-card rg-bait-tile locked">
                     <span class="rg-rank-chip rarity-${bait.rank}">${bait.rank}</span>
-                    <div class="item-info">
-                        <div class="item-name">${bait.name} ×${item.quantity}</div>
-                        <div class="item-desc">所持 ${GameState.getBaitCount(item.id)}個 ／ 在庫 ${item.stock}</div>
-                    </div>
-                    <div class="item-action">${action}</div>
-                </div>
+                    <span class="rg-card-desc">R${item.fromRound}から</span>
+                </div>`;
+            }
+            const rate = FishingGame.estimateBaitSuccess(item.id, power);
+            return `
+                <button class="rg-card rg-bait-tile ${offer.stock <= 0 ? 'sold' : ''}"
+                    onclick="HarborUI.onBuyBait('${item.id}')" ${offer.stock <= 0 ? 'disabled' : ''}>
+                    <span class="rg-rank-chip rarity-${bait.rank}">${bait.rank}</span>
+                    <span class="rg-card-name">×${offer.quantity}</span>
+                    <span class="rg-rate ${rate < 0.5 ? 'rg-low' : ''}">成功 ${Math.round(rate * 100)}%</span>
+                    <span class="rg-card-desc">所持${GameState.getBaitCount(item.id)}・在庫${offer.stock}</span>
+                    ${offer.stock <= 0 ? '<span class="rg-price">売り切れ</span>' : this.priceHtml(offer.price, money)}
+                </button>
             `;
         }).join('');
 
         return `
             <div class="rg-section-head">
                 <h3 class="rg-section-title"><span class="material-icons">auto_fix_high</span> スキル</h3>
-                ${rerollBtn}
+                <button class="btn rg-reroll-btn ${money < rerollCost ? 'disabled' : ''}" onclick="HarborUI.onReroll()">
+                    <span class="material-icons">refresh</span> 入れ替え ${rerollLabel}
+                </button>
             </div>
-            <div class="shop-items">${skillRows}</div>
+            <div class="rg-card-row rg-cols-3">${skillCards}</div>
 
-            <h3 class="rg-section-title"><span class="material-icons">set_meal</span> 餌 <small>買った餌は次のラウンドに持ち越せます</small></h3>
-            <div class="shop-items">${baitRows}</div>
+            <h3 class="rg-section-title"><span class="material-icons">set_meal</span> 餌 <small>成功率は今のパワーでの目安。買った餌は持ち越せます</small></h3>
+            <div class="rg-card-row rg-cols-4">${baitTiles}</div>
 
             <h3 class="rg-section-title"><span class="material-icons">phishing</span> 竿 <small>購入・強化のたびにスキルスロット+1</small></h3>
-            <div class="shop-items">${this.rodHtml(money)}</div>
+            <div class="rg-card-row rg-cols-2">${this.rodHtml(money)}</div>
         `;
     },
 
     rodHtml(money) {
         const rod = GameState.getCurrentRod();
-        const stars = GameState.rodStars;
-        const power = rod.basePower + rod.starPowerBonus * stars;
-        const starsHtml = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+        const power = rod.basePower + rod.starPowerBonus * GameState.rodStars;
 
         const upgradeCost = GameState.getUpgradeCost();
-        const upgradeAction = upgradeCost === null
-            ? `<span class="rg-sold">最大</span>`
-            : this.buyButton(upgradeCost, money, 'HarborUI.onUpgradeRod()');
-
-        let html = `
-            <div class="shop-item">
-                <div class="item-info">
-                    <div class="item-name">${rod.name} <span class="rg-stars">${starsHtml}</span></div>
-                    <div class="item-desc">${upgradeCost === null
-                        ? `竿パワー ${power}`
-                        : `星強化: 竿パワー ${power} → ${power + rod.starPowerBonus}`}</div>
-                </div>
-                <div class="item-action">${upgradeAction}</div>
-            </div>
-        `;
+        let html = upgradeCost === null
+            ? `<div class="rg-card rg-rod-card sold"><span class="rg-card-name">星強化</span><span class="rg-card-desc">最大まで強化済み</span></div>`
+            : `<button class="rg-card rg-rod-card" onclick="HarborUI.onUpgradeRod()">
+                    <span class="rg-card-name">星強化 ★${GameState.rodStars + 1}</span>
+                    <span class="rg-card-desc">竿パワー ${power}→${power + rod.starPowerBonus}、スロット+1</span>
+                    ${this.priceHtml(upgradeCost, money)}
+               </button>`;
 
         const nextIndex = GameState.rodRankIndex + 1;
         const nextRod = GAME_DATA.RODS[nextIndex];
-        if (nextRod) {
-            html += `
-                <div class="shop-item">
-                    <div class="item-info">
-                        <div class="item-name">${nextRod.name} に買い替え</div>
-                        <div class="item-desc">竿パワー ${power} → ${nextRod.basePower}（星は0から。星1つで+${nextRod.starPowerBonus}）</div>
-                    </div>
-                    <div class="item-action">${this.buyButton(GameState.getRodPrice(nextIndex), money, 'HarborUI.onBuyRod()')}</div>
-                </div>
-            `;
-        }
+        html += nextRod
+            ? `<button class="rg-card rg-rod-card" onclick="HarborUI.onBuyRod()">
+                    <span class="rg-card-name">${nextRod.name}</span>
+                    <span class="rg-card-desc">竿パワー ${power}→${nextRod.basePower}（星は0から）、スロット+1</span>
+                    ${this.priceHtml(GameState.getRodPrice(nextIndex), money)}
+               </button>`
+            : `<div class="rg-card rg-rod-card sold"><span class="rg-card-name">買い替え</span><span class="rg-card-desc">最上位の竿です</span></div>`;
         return html;
     },
 
-    // ----------------------------------------
-    // 装備タブ: スキルの付け替え・売却
-    // ----------------------------------------
-    loadoutHtml() {
-        const equipped = GameState.equippedSkills;
-        const slots = GameState.getSkillSlots();
+    // 価格。足りないときは不足額を出す
+    priceHtml(price, money) {
+        if (money >= price) return `<span class="rg-price">${price.toLocaleString()} G</span>`;
+        return `<span class="rg-price rg-short">あと ${(price - money).toLocaleString()} G</span>`;
+    },
 
-        const equippedRows = equipped.map(id => this.skillRow(id,
-            `<button class="btn btn-unequip" onclick="HarborUI.onToggleSkill('${id}', false)">外す</button>`,
-            'equipped')).join('');
+    // ----------------------------------------
+    // フッター: 海域カード（タップでそのまま出航）
+    // ----------------------------------------
+    areaHtml(harbor) {
+        const run = GameState.run;
+        const nextRound = run.round + 1;
+        const supply = GAME_DATA.BAITS.find(b => b.id === RunManager.getSupplyBait(nextRound));
+        const locked = !harbor.rewardTaken;
 
-        // 装備していない分（所持数 − 装備数）を控えとして並べる
-        const benchRows = Object.keys(GameState.skillInventory).map(id => {
-            const spare = GameState.getSkillCount(id) - GameState.getEquippedSkillCount(id);
-            return Array.from({ length: Math.max(0, spare) }, () => this.skillRow(id, `
-                <button class="btn btn-equip" onclick="HarborUI.onToggleSkill('${id}', true)">装備</button>
-                <button class="btn rg-sell-btn" onclick="HarborUI.onSellSkill('${id}')">売る +${RunManager.getSkillSellPrice(id).toLocaleString()}</button>
-            `)).join('');
+        const cards = harbor.areaOffers.map(id => {
+            const area = RunManager.getArea(id);
+            return `
+                <button class="rg-area-card" onclick="HarborUI.onDepart('${id}')" ${locked ? 'disabled' : ''}>
+                    <span class="rg-area-name"><span class="material-icons">${area.icon}</span>${area.name}</span>
+                    <span class="rg-area-target">目標 ${RunManager.getTarget(nextRound, id).toLocaleString()} G</span>
+                    <span class="rg-area-desc">${area.description}</span>
+                </button>
+            `;
         }).join('');
 
-        const emptySlots = Array.from({ length: Math.max(0, slots - equipped.length) },
-            () => `<div class="rg-empty-slot">空きスロット</div>`).join('');
-
         return `
-            <div class="rg-summary">
-                <div class="rg-summary-row"><span>釣りパワー</span><strong>${GameState.getTotalPower()}</strong></div>
-                <div class="rg-summary-row"><span>スキルスロット</span><strong>${equipped.length} / ${slots}</strong></div>
-            </div>
-            <h3 class="rg-section-title"><span class="material-icons">bolt</span> 装備中</h3>
-            <div class="shop-items">${equippedRows}${emptySlots}</div>
-            <h3 class="rg-section-title"><span class="material-icons">inventory_2</span> 控え</h3>
-            <div class="shop-items">${benchRows || '<div class="rg-empty-slot">控えのスキルはありません</div>'}</div>
+            <div class="rg-next-label">${locked ? '報酬を選ぶと出航できます' : `R${nextRound} の海域を選んで出航`}
+                <span class="rg-next-supply">支給: ${supply.name}×${RunManager.config.baitPerRound}</span></div>
+            <div class="rg-area-row">${cards}</div>
         `;
-    },
-
-    // ----------------------------------------
-    // 共通パーツ
-    // ----------------------------------------
-    skillRow(skillId, actionHtml, extraClass = '') {
-        const skill = GameState.getSkillData(skillId);
-        return `
-            <div class="shop-item ${extraClass}">
-                <span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${skill.icon || 'auto_fix_high'}</span>
-                <div class="item-info">
-                    <div class="item-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span></div>
-                    <div class="item-desc">${skill.description}</div>
-                </div>
-                <div class="item-action rg-actions">${actionHtml}</div>
-            </div>
-        `;
-    },
-
-    buyButton(price, money, onclick) {
-        const affordable = money >= price;
-        return `<button class="btn btn-buy ${affordable ? '' : 'disabled'}" onclick="${onclick}">${price.toLocaleString()} G</button>`;
     },
 
     // ========================================
@@ -252,13 +252,11 @@ const HarborUI = {
                 ? `${GameState.getSkillData(skillId).name} を装備しました`
                 : `${GameState.getSkillData(skillId).name} を控えに入れました（スロットが一杯です）`, 'auto_fix_high', 2500);
         }
-        this.tab = 'shop';
         this.render();
     },
 
     onSkipReward() {
         RunManager.skipReward();
-        this.tab = 'shop';
         this.render();
     },
 
@@ -267,17 +265,51 @@ const HarborUI = {
     onBuyBait(baitId) { this._after(RunManager.buyBait(baitId)); },
     onUpgradeRod() { this._after(RunManager.upgradeRod()); },
     onBuyRod() { this._after(RunManager.buyNextRod()); },
-    onSellSkill(skillId) { this._after(RunManager.sellSkill(skillId), '売却できませんでした'); },
+
+    onDepart(areaId) {
+        if (!RunManager.depart(areaId)) {
+            UIManager.showMessage('先に報酬スキルを選んでください', 1500);
+        }
+    },
+
+    // ========================================
+    // スキル詳細（港では装備の付け替え・売却もここで行う）
+    // ========================================
+    showSkill(skillId, isEquipped) {
+        const skill = GameState.getSkillData(skillId);
+        const inHarbor = GameState.run && GameState.run.phase === 'harbor';
+
+        let actions = '';
+        if (inHarbor) {
+            const sell = `<button class="btn rg-sell-btn" onclick="HarborUI.onSellSkill('${skillId}')">売る +${RunManager.getSkillSellPrice(skillId).toLocaleString()} G</button>`;
+            actions = isEquipped
+                ? `<button class="btn btn-unequip" onclick="HarborUI.onToggleSkill('${skillId}', false)">外す</button>${sell}`
+                : `<button class="btn btn-equip" onclick="HarborUI.onToggleSkill('${skillId}', true)">装備する</button>${sell}`;
+        }
+
+        const overlay = this.openModal('skill-modal', `
+            <div class="modal-header">
+                <h2><span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${skill.icon || 'auto_fix_high'}</span> ${skill.name}</h2>
+                <button class="btn-close" onclick="HarborUI.closeModal('skill-modal')"><span class="material-icons">close</span></button>
+            </div>
+            <p class="rg-skill-detail"><span class="rg-tier-badge rg-tier-${skill.tier}">Tier ${this.TIER_LABELS[skill.tier]}</span> ${isEquipped ? '装備中' : '控え'}</p>
+            <p class="rg-skill-detail">${skill.description}</p>
+            ${actions ? `<div class="rg-modal-actions">${actions}</div>` : ''}
+        `);
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) this.closeModal('skill-modal');
+        });
+    },
 
     onToggleSkill(skillId, equip) {
         const result = RunManager.toggleSkill(skillId, equip);
+        this.closeModal('skill-modal');
         this._after(result.can, result.reason);
     },
 
-    onDepart() {
-        if (!RunManager.depart()) {
-            UIManager.showMessage('先に報酬スキルを選んでください', 1500);
-        }
+    onSellSkill(skillId) {
+        this.closeModal('skill-modal');
+        this._after(RunManager.sellSkill(skillId), '売却できませんでした');
     },
 
     // ========================================
@@ -308,7 +340,8 @@ const HarborUI = {
         if (!run) return;
 
         const rod = GameState.getCurrentRod();
-        const skills = GameState.equippedSkills.map(id => this.skillRow(id, '')).join('')
+        const area = GameState.getCurrentArea();
+        const skills = GameState.equippedSkills.map(id => this.skillRow(id)).join('')
             || '<div class="rg-empty-slot">スキルを装備していません</div>';
 
         const overlay = this.openModal('build-modal', `
@@ -321,6 +354,8 @@ const HarborUI = {
                     <div class="rg-summary-row"><span>竿</span><strong>${rod.name} ${'★'.repeat(GameState.rodStars)}</strong></div>
                     <div class="rg-summary-row"><span>釣りパワー</span><strong>${GameState.getTotalPower()}</strong></div>
                     <div class="rg-summary-row"><span>スキルスロット</span><strong>${GameState.equippedSkills.length} / ${GameState.getSkillSlots()}</strong></div>
+                    ${area ? `<div class="rg-summary-row"><span>海域</span><strong>${area.name}</strong></div>
+                    <div class="rg-summary-row"><span></span><span class="rg-area-desc">${area.description}</span></div>` : ''}
                 </div>
                 <div class="shop-items">${skills}</div>
                 <p class="rg-note">装備の変更と買い物は、ラウンドをクリアした後の港で行えます。</p>
@@ -330,6 +365,19 @@ const HarborUI = {
         overlay.addEventListener('click', e => {
             if (e.target === overlay) this.closeModal('build-modal');
         });
+    },
+
+    skillRow(skillId) {
+        const skill = GameState.getSkillData(skillId);
+        return `
+            <div class="shop-item">
+                <span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${skill.icon || 'auto_fix_high'}</span>
+                <div class="item-info">
+                    <div class="item-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span></div>
+                    <div class="item-desc">${skill.description}</div>
+                </div>
+            </div>
+        `;
     },
 
     onRetire() {
@@ -345,6 +393,9 @@ const HarborUI = {
         const run = GameState.run;
         const cleared = run.round - 1;
         const biggest = GameState.biggestFish ? GameState.biggestFish.name : '―';
+        const st = run.stats;
+        const pct = (a, b) => b > 0 ? `${Math.round(a / b * 100)}%` : '―';
+        const stops = st.zones.red + st.zones.green + st.zones.white;
 
         this.openModal('gameover-modal', `
             <div class="rg-gameover">
@@ -354,7 +405,9 @@ const HarborUI = {
                 ${isBest ? '<div class="rg-banner"><span class="material-icons">military_tech</span> 最高記録を更新！</div>' : ''}
                 <div class="rg-summary">
                     <div class="rg-summary-row"><span>クリアしたラウンド</span><strong>${cleared}</strong></div>
-                    <div class="rg-summary-row"><span>釣った魚</span><strong>${GameState.totalFishCaught} 匹</strong></div>
+                    <div class="rg-summary-row"><span>釣り上げ成功率</span><strong>${pct(st.catches, st.casts)}（${st.catches}/${st.casts}投）</strong></div>
+                    <div class="rg-summary-row"><span>赤ゾーンで止めた割合</span><strong>${pct(st.zones.red, stops)}</strong></div>
+                    <div class="rg-summary-row"><span>逃げられた魚の平均パワー</span><strong>${st.escapes > 0 ? Math.round(st.escapedPower / st.escapes) : '―'}（自分 ${GameState.getTotalPower()}）</strong></div>
                     <div class="rg-summary-row"><span>稼いだ総額</span><strong>${GameState.totalMoneyEarned.toLocaleString()} G</strong></div>
                     <div class="rg-summary-row"><span>一番の大物</span><strong>${biggest}</strong></div>
                 </div>
