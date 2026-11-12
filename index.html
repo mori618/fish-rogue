@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="フィッシング・エボリューション - 魚を釣り、売り、装備を強化する成長型釣りゲーム">
-    <title>フィッシング・エボリューション</title>
+    <meta name="description" content="フィッシング・ローグ - 限られた餌でラウンド目標に挑むローグライト釣りゲーム">
+    <title>フィッシング・ローグ</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="chinchiro.css">
+    <link rel="stylesheet" href="rogue.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -30,18 +30,23 @@
             <h1 class="game-title">
                 <span class="title-icon"><span class="material-icons">phishing</span></span>
                 <span class="title-text">フィッシング</span>
-                <span class="title-sub">エボリューション</span>
+                <span class="title-sub">ローグ</span>
             </h1>
             <div class="start-buttons">
                 <button id="start-btn" class="btn-main">
                     <span class="btn-icon">▶</span>
-                    はじめから
+                    新しい航海
                 </button>
                 <button id="continue-btn" class="btn-main btn-continue hidden">
                     <span class="btn-icon">↻</span>
                     つづきから
                 </button>
+                <button id="encyclopedia-btn" class="btn-nav">
+                    <span class="material-icons">menu_book</span>
+                    魚図鑑
+                </button>
             </div>
+            <div id="start-record" class="rg-start-record"></div>
         </div>
     </div>
 
@@ -58,7 +63,7 @@
             <div class="cloud cloud3"></div>
         </div>
 
-        <!-- フローティングステータス（左側） -->
+        <!-- フローティングステータス（左側）: 所持金・パワー・ラウンド目標 -->
         <div class="floating-status floating-status-left">
             <div class="status-pill">
                 <span class="status-icon"><span class="material-icons">paid</span></span>
@@ -68,25 +73,15 @@
                 <span class="status-icon"><span class="material-icons">phishing</span></span>
                 <span id="power-display" class="status-value">10</span>
             </div>
-            <div class="status-pill">
-                <span class="status-icon"><span class="material-icons">set_meal</span></span>
-                <span id="inventory-count" class="status-value">0 匹</span>
-            </div>
-            <div class="status-pill">
-                <span class="status-icon"><span class="material-icons">confirmation_number</span></span>
-                <span id="gacha-ticket-display" class="status-value">0</span>
-            </div>
 
-            <!-- 初心者ミッション表示 -->
-            <div id="mission-display" class="mission-display">
-                <div class="mission-label">MISSION</div>
-                <div id="mission-text" class="mission-text">ミッション読み込み中...</div>
+            <div id="run-panel" class="mission-display rg-run-panel">
+                <div id="round-label" class="mission-label">ROUND 1</div>
+                <div class="rg-progress">
+                    <div id="round-progress-bar" class="rg-progress-fill"></div>
+                </div>
+                <div id="round-progress-text" class="mission-text">0 / 0 G</div>
             </div>
         </div>
-
-
-
-
 
         <!-- メイン釣りエリア -->
         <main id="fishing-area" class="fishing-area">
@@ -110,31 +105,21 @@
 
 
 
-        <!-- 中央下部HUD（餌・竿・町） -->
+        <!-- 中央下部HUD（装備・餌・竿） -->
         <div class="bottom-hud-center">
-            <!-- 町へボタン -->
-            <button id="shop-btn-top" class="floating-btn btn-town">
-                <span class="material-icons">holiday_village</span>
-                <span class="btn-label">町へ</span>
+            <!-- 装備確認ボタン -->
+            <button id="build-btn" class="floating-btn btn-town">
+                <span class="material-icons">backpack</span>
+                <span class="btn-label">装備</span>
             </button>
             <!-- 餌情報 -->
             <div id="bait-status-display" class="bait-status-large">
                 <div id="bait-info" class="bait-value"></div>
+                <div id="bait-total" class="rg-bait-total"></div>
             </div>
             <!-- 装備中の竿 -->
-            <div id="rod-info" class="rod-badge">
-                <span class="rod-name">木の釣竿</span>
-                <span class="rod-stars"><span class="material-icons star-empty">star_border</span><span
-                        class="material-icons star-empty">star_border</span><span
-                        class="material-icons star-empty">star_border</span><span
-                        class="material-icons star-empty">star_border</span><span
-                        class="material-icons star-empty">star_border</span></span>
-            </div>
+            <div id="rod-info" class="rod-badge"></div>
         </div>
-
-        <!-- 底部ナビゲーション -->
-
-
     </div>
 
     <!-- ========================================
@@ -149,16 +134,12 @@
 
             <div class="help-tabs">
                 <button class="help-tab active" data-target="help-fishing">釣り</button>
-                <button class="help-tab" data-target="help-town">町・施設</button>
-                <button class="help-tab" data-target="help-growth">成長・要素</button>
-                <button class="help-tab" data-target="help-mission">任務</button>
+                <button class="help-tab" data-target="help-run">航海のルール</button>
+                <button class="help-tab" data-target="help-growth">強化</button>
             </div>
 
             <div class="help-body">
                 <div id="help-fishing" class="help-section active">
-                    <div class="help-hero-image">
-                        <span class="material-icons">phishing</span>
-                    </div>
                     <h3>🎣 釣りの流れ</h3>
                     <div class="help-step-container">
                         <div class="help-step-card">
@@ -175,165 +156,67 @@
                         </div>
                     </div>
                     <div class="help-info-box gold">
-                        <small>💡 <strong>コツ:</strong> 強い魚ほどバトルゲージが速くなります。竿を強化して挑みましょう。</small>
+                        <small>💡 <strong>コツ:</strong> 魚のパワーが自分のパワーを大きく上回ると、赤ゾーンで止めても逃げられやすくなります。</small>
                     </div>
                 </div>
 
-                <div id="help-town" class="help-section">
-                    <h3>🏘️ 町の施設案内</h3>
-                    <div class="help-grid">
-                        <div class="grid-item">
-                            <div class="item-icon"><span class="material-icons">storefront</span></div>
-                            <div class="item-info"><strong>釣具店</strong>
-                                <p>強力な竿や効率の良い餌を購入できます。</p>
-                            </div>
-                        </div>
-                        <div class="grid-item">
-                            <div class="item-icon"><span class="material-icons">auto_fix_high</span></div>
-                            <div class="item-info"><strong>スキル店</strong>
-                                <p>釣りを有利にするパッシブスキルを習得！</p>
-                            </div>
-                        </div>
-                        <div class="grid-item">
-                            <div class="item-icon"><span class="material-icons">casino</span></div>
-                            <div class="item-info"><strong>カジノ</strong>
-                                <p>運を味方に。レアな景品やガシャ券を狙おう。</p>
-                            </div>
-                        </div>
-                    </div>
+                <div id="help-run" class="help-section">
+                    <h3>⛵ 航海のルール</h3>
+                    <ul class="help-simple-list">
+                        <li><strong>目標:</strong> 各ラウンドで、釣った魚の水揚げ額を目標額まで稼ぎます。釣った魚は自動で売却されます。</li>
+                        <li><strong>餌:</strong> 一投ごとに餌を1つ使います（釣れなくても減ります）。毎ラウンド基本の餌が支給されます。</li>
+                        <li><strong>ゲームオーバー:</strong> 目標に届かないまま餌がすべて尽きると航海は終わりです。</li>
+                        <li><strong>クリア:</strong> 目標に届いた時点でラウンドクリア。余った基本の餌はボーナスになります。</li>
+                    </ul>
                 </div>
 
                 <div id="help-growth" class="help-section">
-                    <h3>✨ 重要な成長要素</h3>
+                    <h3>✨ 港での強化</h3>
                     <div class="feature-card">
-                        <h4>🌞 フィーバーシステム</h4>
-                        <p>釣りを続けると太陽や月のレベルが上昇！最大になるとレア魚の出現率が大幅アップする「フィーバー」が発動します。</p>
+                        <h4>🎁 報酬スキル</h4>
+                        <p>ラウンドをクリアするたびに、3つの中からスキルを1つもらえます。</p>
                     </div>
                     <div class="feature-card">
-                        <h4>🏆 魚ランク (D〜S)</h4>
-                        <p>魚にはランクがあり、高ランクほど高く売れます。図鑑を埋めてコンプリートを目指しましょう！</p>
+                        <h4>🛒 買い物</h4>
+                        <p>上位ランクの餌（高い魚が釣れる）、スキル、竿の強化を購入できます。竿を強化するとスキルスロットも増えます。</p>
                     </div>
-                </div>
-
-                <div id="help-mission" class="help-section">
-                    <h3>📜 冒険の証</h3>
-                    <ul class="help-simple-list">
-                        <li><strong>初心者ミッション:</strong> 基本操作を学び、序盤の資金を確保しましょう。</li>
-                        <li><strong>ダイアリー任務:</strong> 毎日更新される目標。ガシャチケットが手に入ります。</li>
-                    </ul>
+                    <div class="feature-card">
+                        <h4>🌞 フィーバー</h4>
+                        <p>釣りを続けると太陽か月が育ち、最大になると宝箱やレア魚が出やすくなります。</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div id="shop-screen" class="screen">
+
+    <!-- ========================================
+         港画面（ラウンド間の報酬・買い物・装備）
+         ======================================== -->
+    <div id="harbor-screen" class="screen">
         <header class="shop-header">
-            <h2 id="shop-main-title" class="shop-title"><span class="material-icons">location_city</span> フィッシング・タウン
-            </h2>
+            <h2 class="shop-title"><span class="material-icons">anchor</span> <span id="harbor-title">港</span></h2>
             <div class="shop-money">
                 <span class="status-icon"><span class="material-icons">paid</span></span>
-                <span id="shop-money-display">¥0</span>
+                <span id="shop-money-display">0 G</span>
             </div>
         </header>
 
+        <div id="harbor-tabs" class="shop-tabs">
+            <button class="shop-tab active" data-tab="shop">ショップ</button>
+            <button class="shop-tab" data-tab="loadout">装備 <span id="harbor-loadout-count"></span></button>
+        </div>
+
         <main class="shop-content">
-            <div id="town-menu" class="town-menu">
-                <!-- Town buildings will be injected here -->
-            </div>
-
-            <section id="upgrade-section" class="upgrade-section hidden">
-                <!-- Upgrade info will be injected here -->
-            </section>
-
-            <div id="shop-tabs-container" class="shop-tabs-container">
-                <!-- Tabs will be injected here -->
-            </div>
-
-            <section id="shop-items" class="shop-items">
-                <!-- Shop items will be injected here -->
-            </section>
+            <div id="harbor-main"></div>
         </main>
 
-        <footer class="shop-footer">
-            <div id="shop-footer-actions" style="display: flex; gap: 16px; width: 100%;">
-                <!-- Dynamic footer buttons -->
-            </div>
+        <footer class="shop-footer rg-harbor-footer">
+            <div id="harbor-next" class="rg-next-info"></div>
+            <button id="depart-btn" class="btn-main">
+                <span class="material-icons">sailing</span>
+                出航
+            </button>
         </footer>
-    </div>
-
-    <div id="casino-screen" class="screen">
-        <header class="casino-header">
-            <button class="btn-header-back" onclick="ShopManager.setCategory('town')">
-                <span class="material-icons">arrow_back</span>
-            </button>
-            <h2 class="casino-title"><span class="material-icons">stars</span> グランド・カジノ</h2>
-            <div class="shop-money">
-                <span class="status-icon"><span class="material-icons">paid</span></span>
-                <span id="casino-money-display">¥0</span>
-            </div>
-        </header>
-
-        <main class="shop-content casino-theme">
-            <div id="casino-main-area">
-                <!-- Casino content injected here -->
-            </div>
-        </main>
-    </div>
-
-    <div id="port-screen" class="screen">
-        <header class="shop-header">
-            <button class="btn-header-back" onclick="ShopManager.setCategory('town')">
-                <span class="material-icons">arrow_back</span>
-            </button>
-            <h2 class="shop-title"><span class="material-icons">anchor</span> ポート・ロイヤル</h2>
-            <div class="shop-money">
-                <span class="status-icon"><span class="material-icons">paid</span></span>
-                <span id="port-money-display">¥0</span>
-            </div>
-        </header>
-
-        <main class="shop-content">
-            <div id="port-main-area">
-                <!-- Port content injected here -->
-            </div>
-        </main>
-    </div>
-
-    <div id="synthesis-screen" class="screen">
-        <header class="shop-header">
-            <button class="btn-header-back" onclick="ShopManager.setCategory('town')">
-                <span class="material-icons">arrow_back</span>
-            </button>
-            <h2 class="shop-title"><span class="material-icons">Science</span> 合成工房</h2>
-            <div class="shop-money">
-                <span class="status-icon"><span class="material-icons">paid</span></span>
-                <span id="synthesis-money-display">¥0</span>
-            </div>
-        </header>
-
-        <main class="shop-content">
-            <div id="synthesis-main-area">
-                <!-- Synthesis content injected here -->
-            </div>
-        </main>
-    </div>
-
-    <div id="debug-screen" class="screen">
-        <header class="shop-header">
-            <button class="btn-header-back" onclick="ShopManager.setCategory('town')">
-                <span class="material-icons">arrow_back</span>
-            </button>
-            <h2 class="shop-title"><span class="material-icons">admin_panel_settings</span> デバッグルーム</h2>
-            <div class="shop-money">
-                <span class="status-icon"><span class="material-icons">construction</span></span>
-                <span>DEVELOPER MODE</span>
-            </div>
-        </header>
-
-        <main class="shop-content">
-            <div id="debug-main-area">
-                <!-- Debug content injected here -->
-            </div>
-        </main>
     </div>
 
     <!-- ========================================
@@ -355,66 +238,10 @@
 
         <footer class="shop-footer">
             <button id="encyclopedia-back-btn" class="btn-nav" style="flex: 1;">
-                <span class="material-icons">store</span>
-                ショップに戻る
+                <span class="material-icons">arrow_back</span>
+                タイトルに戻る
             </button>
         </footer>
-    </div>
-
-    <!-- ========================================
-         実績画面（戦績）
-         ======================================== -->
-    <div id="stats-screen" class="screen">
-        <header class="shop-header">
-            <h2 class="shop-title"><span class="material-icons">query_stats</span> 戦績・実績</h2>
-        </header>
-
-        <main class="shop-content">
-            <div id="stats-container" class="stats-container">
-                <!-- 動的に表示 -->
-            </div>
-        </main>
-
-        <footer class="shop-footer">
-            <button id="stats-back-btn" class="btn-nav" style="flex: 1;">
-                <span class="material-icons">menu_book</span>
-                図鑑に戻る
-            </button>
-        </footer>
-    </div>
-
-    <!-- ========================================
-         ガチャ専用演出画面
-         ======================================== -->
-    <div id="gacha-screen" class="screen">
-        <div class="gacha-bg">
-            <div class="gacha-particles" id="gacha-particles"></div>
-            <div class="gacha-light-rays"></div>
-        </div>
-
-        <div class="gacha-stage">
-            <div id="gacha-machine-container" class="gacha-machine-container">
-                <!-- ガチャマシンのビジュアル -->
-                <div class="gacha-machine">
-                    <div class="machine-glass">
-                        <div class="capsule-container" id="capsule-container"></div>
-                    </div>
-                    <div class="machine-body">
-                        <div class="machine-handle" id="gacha-handle">
-                            <span class="material-icons">autorenew</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="gacha-result-display" class="gacha-result-display hidden">
-                <div class="result-header">GACHA RESULT</div>
-                <div id="gacha-items-container" class="gacha-items-container"></div>
-                <div class="result-footer">
-                    <button id="gacha-close-btn" class="btn-main">閉じる</button>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- ========================================
@@ -424,15 +251,10 @@
     <script src="js/SaveManager.js"></script>
     <script src="js/GameState.js"></script>
     <script src="js/FishingGame.js"></script>
-    <script src="js/ShopManager.js"></script>
-    <script src="js/CasinoManager.js"></script>
-    <script src="js/MissionManager.js"></script>
+    <script src="js/RunManager.js"></script>
     <script src="js/EncyclopediaManager.js"></script>
-    <script src="js/SkillInventoryManager.js"></script>
     <script src="js/UIManager.js"></script>
-    <script src="js/PortManager.js"></script>
-    <script src="js/SynthesisManager.js"></script>
-    <script src="js/DebugManager.js"></script>
+    <script src="js/HarborUI.js"></script>
     <script src="js/main.js"></script>
 </body>
 

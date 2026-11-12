@@ -1,0 +1,444 @@
+/* ========================================
+   フィッシング・ローグ 追加スタイル
+   ローグライト化で増えた部品（ラウンド表示・港・ゲームオーバー）のみを定義する。
+   色やボタンなどの基本の見た目は styles.css のものをそのまま使う。
+   ======================================== */
+
+/* ----------------------------------------
+   スタート画面
+   ---------------------------------------- */
+.start-buttons .btn-nav {
+    padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.rg-start-record {
+    margin-top: var(--spacing-lg);
+    min-height: 1.5em;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent-color);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ----------------------------------------
+   釣り画面: ラウンド目標パネル
+   ---------------------------------------- */
+.rg-run-panel {
+    min-width: 170px;
+    margin-top: 0;
+}
+
+.rg-progress {
+    height: 8px;
+    margin: 4px 0 6px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.rg-progress-fill {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+/* 目標の進み具合は一番見る情報なので、狭い画面でも縮めない */
+#run-panel {
+    padding: 8px 12px;
+}
+
+#run-panel .mission-label {
+    font-size: 11px;
+}
+
+#run-panel .mission-text {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 14px;
+}
+
+/* 釣り画面: 餌の合計 */
+.rg-bait-total {
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+.rg-bait-total.rg-low {
+    color: #fca5a5;
+}
+
+/* ----------------------------------------
+   港画面
+   ---------------------------------------- */
+#harbor-screen {
+    background: var(--bg-dark);
+    color: var(--text-primary);
+}
+
+.rg-harbor-footer {
+    align-items: center;
+    padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
+}
+
+.rg-next-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.rg-next-label {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: var(--accent-color);
+}
+
+.rg-next-value {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+#depart-btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: 18px;
+}
+
+#depart-btn:disabled {
+    filter: grayscale(1);
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.rg-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-weight: 700;
+    color: #3e2723;
+    background: linear-gradient(135deg, #ffd700, #f59e0b);
+    border-radius: var(--radius-md);
+}
+
+.rg-summary {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.rg-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: 6px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.rg-summary-row + .rg-summary-row {
+    border-top: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.rg-summary-row strong {
+    color: var(--text-primary);
+    font-family: 'Roboto Mono', monospace;
+    text-align: right;
+}
+
+.rg-summary-row strong.rg-plus {
+    color: #4ade80;
+}
+
+.rg-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.rg-section-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: var(--spacing-md) 0 var(--spacing-sm);
+    font-size: 15px;
+    color: var(--accent-color);
+}
+
+.rg-section-title .material-icons {
+    font-size: 18px;
+}
+
+.rg-section-title small {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+/* 報酬スキルの3択 */
+.rg-reward-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+}
+
+.rg-reward-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: var(--spacing-md) var(--spacing-sm);
+    color: var(--text-primary);
+    font-family: inherit;
+    text-align: center;
+    background: var(--bg-card);
+    border: 2px solid var(--rg-tier-color, var(--border-color));
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rg-reward-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 12px var(--rg-tier-color, transparent);
+}
+
+.rg-reward-card:active {
+    transform: translateY(1px);
+}
+
+.rg-reward-icon {
+    font-size: 36px;
+    color: var(--rg-tier-color);
+}
+
+.rg-reward-name {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.rg-reward-desc {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.rg-skip-btn {
+    width: 100%;
+    margin-top: var(--spacing-md);
+}
+
+/* Tier の色（I〜極、特別） */
+.rg-tier-1 { --rg-tier-color: #bcaaa4; }
+.rg-tier-2 { --rg-tier-color: #22c55e; }
+.rg-tier-3 { --rg-tier-color: #3b82f6; }
+.rg-tier-4 { --rg-tier-color: #a855f7; }
+.rg-tier-0 { --rg-tier-color: #f59e0b; }
+
+.rg-tier-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1c1410;
+    background: var(--rg-tier-color);
+    border-radius: 10px;
+    vertical-align: middle;
+}
+
+/* 商品行（styles.css の .shop-item に載せる部品） */
+#harbor-screen .shop-item,
+.rg-modal .shop-item {
+    gap: var(--spacing-sm);
+    padding: 10px var(--spacing-md);
+}
+
+.rg-skill-icon {
+    flex-shrink: 0;
+    font-size: 26px;
+    color: var(--rg-tier-color);
+}
+
+.rg-rank-chip {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+}
+
+.rg-stars {
+    color: var(--accent-color);
+    letter-spacing: 1px;
+}
+
+.rg-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rg-actions:empty {
+    display: none;
+}
+
+#harbor-screen .btn {
+    padding: 8px 12px;
+    white-space: nowrap;
+}
+
+.btn.disabled {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+}
+
+.rg-reroll-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--secondary-color);
+}
+
+.rg-reroll-btn .material-icons {
+    font-size: 16px;
+}
+
+.rg-sell-btn {
+    color: var(--accent-color);
+    background: transparent;
+    border: 1px solid var(--accent-color);
+}
+
+.rg-sold {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.rg-empty-slot {
+    padding: 10px var(--spacing-md);
+    font-size: 13px;
+    text-align: center;
+    color: var(--text-secondary);
+    border: 1px dashed var(--secondary-color);
+    border-radius: var(--radius-md);
+}
+
+/* ----------------------------------------
+   モーダル（装備確認・ゲームオーバー）
+   ---------------------------------------- */
+.rg-modal {
+    width: min(92vw, 420px);
+    max-width: 420px;
+    max-height: 86vh;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-md);
+    color: var(--text-primary);
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.rg-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.rg-modal .modal-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 18px;
+}
+
+.rg-modal-body {
+    overflow-y: auto;
+}
+
+.rg-note {
+    margin: var(--spacing-md) 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.rg-retire-btn {
+    width: 100%;
+    color: var(--danger-color);
+    border-color: var(--danger-color);
+    box-shadow: none;
+}
+
+.rg-gameover {
+    text-align: center;
+    overflow-y: auto;
+}
+
+.rg-gameover-title {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: var(--danger-color);
+}
+
+.rg-gameover-lead {
+    margin: var(--spacing-sm) 0 var(--spacing-md);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.rg-gameover .rg-summary {
+    text-align: left;
+}
+
+.rg-gameover-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: 0 var(--spacing-sm) var(--spacing-sm);
+}
+
+/* ----------------------------------------
+   狭い画面
+   ---------------------------------------- */
+@media (max-width: 480px) {
+    .rg-reward-list {
+        grid-template-columns: 1fr;
+    }
+
+    .rg-reward-card {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas: "icon name badge" "icon desc desc";
+        align-items: center;
+        column-gap: var(--spacing-md);
+        text-align: left;
+    }
+
+    .rg-reward-icon { grid-area: icon; }
+    .rg-reward-name { grid-area: name; }
+    .rg-reward-desc { grid-area: desc; }
+    .rg-reward-card .rg-tier-badge { grid-area: badge; }
+}

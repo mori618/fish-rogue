@@ -554,7 +554,7 @@ const BAITS = [
         id: 'bait_d',
         name: 'Dランクの餌',
         rank: 'D',
-        description: '基本の餌。Dランクが釣れやすい。釣れても消費されない。',
+        description: '毎ラウンド支給される基本の餌。Dランクが釣れやすい。',
         price: 0,
         quantity: 1
     },
@@ -562,7 +562,7 @@ const BAITS = [
         id: 'bait_c',
         name: 'Cランクの餌',
         rank: 'C',
-        description: 'Cランクが釣れやすい。失敗しても消費されない。',
+        description: 'Cランクが釣れやすい。',
         price: 50,
         quantity: 5
     },
@@ -570,7 +570,7 @@ const BAITS = [
         id: 'bait_b',
         name: 'Bランクの餌',
         rank: 'B',
-        description: 'Bランクが釣れやすい。失敗しても消費されない。',
+        description: 'Bランクが釣れやすい。',
         price: 200,
         quantity: 5
     },
@@ -578,7 +578,7 @@ const BAITS = [
         id: 'bait_a',
         name: 'Aランクの餌',
         rank: 'A',
-        description: 'Aランクが釣れやすい。釣れなくても消費される。',
+        description: 'Aランクが釣れやすい。',
         price: 800,
         quantity: 5
     },
@@ -586,7 +586,7 @@ const BAITS = [
         id: 'bait_s',
         name: 'Sランクの餌',
         rank: 'S',
-        description: 'Sランクが釣れやすい。釣れなくても消費される。',
+        description: 'Sランクが釣れやすい。',
         price: 3000,
         quantity: 5
     }
@@ -946,6 +946,67 @@ const FUELS = [
     }
 ];
 
+// ========================================
+// ローグライト設定
+// 航海（ラン）のバランスはここでまとめて調整する
+// ========================================
+const ROGUE_CONFIG = {
+    // --- ラウンド ---
+    finalRound: 10,                 // このラウンドをクリアすると航海達成（以降はエンドレス）
+    targets: [100, 220, 450, 900, 1600, 2800, 4800, 8000, 13000, 20000], // 各ラウンドの目標水揚げ額(G)
+    endlessGrowth: 1.8,             // 最終ラウンド以降の目標の伸び率
+    baitPerRound: 10,               // 毎ラウンド支給される基本の餌(bait_d)の数
+
+    // --- ラウンドクリア報酬 ---
+    clearBonusRate: 0.25,           // 目標額に対するクリアボーナスの割合
+    leftoverBaitBonus: 10,          // 余った基本の餌1個あたりのボーナス(G) × ラウンド数
+    rewardChoices: 3,               // 報酬スキルの選択肢の数
+    rewardSkipRate: 0.15,           // 報酬スキルを受け取らない場合にもらえる額（目標額に対する割合）
+
+    // --- スキル ---
+    baseSkillSlots: 2,
+    maxSkillSlots: 12,
+    skillPrices: { 1: 120, 2: 450, 3: 1500, 4: 5000, 0: 12000 }, // Tier別の店売り価格 (0 = 特別スキル)
+    skillSellRate: 0.4,             // 売却時に戻る割合
+    shopSkillCount: 3,              // 港に並ぶスキルの数
+    rerollBaseRate: 0.05,           // 入れ替え費用（次ラウンド目標に対する割合）
+    rerollGrowth: 1.5,              // 同じ港で入れ替えるたびの費用倍率
+
+    // ラウンドごとのTier出現重み（from 以降のラウンドで適用。後ろの定義が優先）
+    tierWeights: [
+        { from: 1, weights: { 1: 100 } },
+        { from: 3, weights: { 1: 70, 2: 30 } },
+        { from: 5, weights: { 1: 40, 2: 45, 3: 15 } },
+        { from: 7, weights: { 1: 20, 2: 40, 3: 30, 4: 9, 0: 1 } },
+        { from: 9, weights: { 1: 10, 2: 30, 3: 35, 4: 20, 0: 5 } }
+    ],
+
+    // ローグライト版では機能しない／バランスを壊すため出現させない効果
+    excludedEffects: [
+        'ultimate_risk', 'rank_sniper', 'rank_sniper_fixed', 'hard_mode', 'good_feel',
+        'infinite_bait', 'mobile_shop', 'perpetual_engine',
+        'ship_interval_down', 'ship_amount_up', 'ship_fuel_eco', 'ship_fuel_discount',
+        'stoic', 'xp_boost', 'rank_power_boost', 'rank_reward_boost', 'log_coin_boost',
+        'mission_reward_up', 'gacha_mission_boost', 'recycle_boost',
+        'count_fish_gacha', 'count_gacha_coin', 'count_fish_title', 'count_gacha_sell'
+    ],
+
+    // --- 港で買える餌（1回の寄港ごとの在庫つき） ---
+    baitShop: [
+        { id: 'bait_c', quantity: 3, price: 45, stock: 3, fromRound: 1 },
+        { id: 'bait_b', quantity: 3, price: 180, stock: 3, fromRound: 2 },
+        { id: 'bait_a', quantity: 3, price: 700, stock: 3, fromRound: 4 },
+        { id: 'bait_s', quantity: 2, price: 2400, stock: 3, fromRound: 6 }
+    ],
+
+    // --- 竿（原作の価格に掛ける倍率） ---
+    costMult: { rod: 0.4, upgrade: 0.4 },
+
+    // ラウンドごとの空（見た目のみ）
+    skyByRound: ['sky_default', 'sky_default', 'sky_sunset', 'sky_sunset', 'sky_night', 'sky_night',
+        'sky_cherry', 'sky_storm', 'sky_aurora', 'sky_galaxy']
+};
+
 // エクスポート用（グローバル変数として使用）
 if (typeof window !== 'undefined') {
     window.GAME_DATA = {
@@ -965,6 +1026,7 @@ if (typeof window !== 'undefined') {
         SHIPS,
         FUELS,
         SPECIAL_RECIPES,
-        RANK_SYSTEM
+        RANK_SYSTEM,
+        ROGUE_CONFIG
     };
 }

@@ -1,197 +1,109 @@
 // セーブマネージャー
-// localStorageを使用したゲームデータの永続化
+// localStorage に2種類のデータを保存する
+//   - 航海データ: 進行中の航海（ラン）。ゲームオーバーで削除される
+//   - メタデータ: 図鑑と最高記録。航海をまたいで残る
 
 const SaveManager = {
-    SAVE_KEY: 'fishing_evolution_save',
-    VERSION: '1.0',
+    RUN_KEY: 'fish_rogue_run',
+    META_KEY: 'fish_rogue_meta',
+    VERSION: 1,
 
     // ========================================
-    // 初期データ（新規ゲーム用）
+    // 航海データ
     // ========================================
-    getDefaultData() {
-        return {
+    save(gameState = GameState) {
+        const data = {
             version: this.VERSION,
             saveDate: new Date().toISOString(),
-            player: {
-                money: 0,
-                baitCount: 0,
-                baitCount: 0,
-                baitType: null,
-                selectedSkin: 'skin_default'
-            },
-            rod: {
-                rankIndex: 0,       // 現在の釣り竿のインデックス
-                stars: 0,           // 星の数（0〜5）
-                equippedSkills: []  // 装着中のスキルID配列
-            },
-            inventory: [],          // 持っている魚の配列
-            unlocked: {
-                rods: [0],          // アンロック済み釣り竿のインデックス
-                skillInventory: {},  // IDごとの所持数 { "power_up_1": 3 }
-                skins: ['skin_default'],
-                skies: ['sky_default']
-            },
-            encyclopedia: {},       // 図鑑データ { fishId: { count: 0, hasSpecial: false } }
-            statistics: {
-                totalFishCaught: 0,
-                caughtByRank: { 'D': 0, 'C': 0, 'B': 0, 'A': 0, 'S': 0, 'SS': 0 },
-                totalTreasure: 0,
-                totalSkills: 0,
-                totalMoneyEarned: 0,
-                totalCoinsEarned: 0,
-                casinoTotalWin: 0,
-                casinoTotalLoss: 0,
-                gachaTickets: 0,
-                currentMissionIndex: 0,
-                missionProgress: 0,
-                beginnerMissionCompleted: [],
-                beginnerMissionProgress: {},
-                dynamicMissions: null,
-                dynamicMissionCompletedCount: 0,
-                biggestFish: null
-            }
+            money: gameState.money,
+            baitInventory: { ...gameState.baitInventory },
+            baitType: gameState.baitType,
+            run: gameState.run,
+            rodRankIndex: gameState.rodRankIndex,
+            rodStarLevels: { ...gameState.rodStarLevels },
+            unlockedRods: [...gameState.unlockedRods],
+            equippedSkills: [...gameState.equippedSkills],
+            skillInventory: { ...gameState.skillInventory },
+            selectedSky: gameState.selectedSky,
+            totalFishCaught: gameState.totalFishCaught,
+            caughtByRank: { ...gameState.caughtByRank },
+            totalTreasure: gameState.totalTreasure,
+            totalMoneyEarned: gameState.totalMoneyEarned,
+            biggestFish: gameState.biggestFish,
+            fever: { ...gameState.fever }
         };
+
+        const savedRun = this._write(this.RUN_KEY, data);
+
+        // 図鑑は釣るたびに増えるので、航海データと一緒にメタにも反映する
+        const meta = this.loadMeta();
+        meta.encyclopedia = { ...gameState.encyclopedia };
+        return this._write(this.META_KEY, meta) && savedRun;
     },
 
-    // ========================================
-    // セーブ機能
-    // ========================================
-    save(gameState) {
-        try {
-            const saveData = {
-                version: this.VERSION,
-                saveDate: new Date().toISOString(),
-                player: {
-                    money: gameState.money,
-                    baitCount: gameState.baitCount,
-                    // baitTypeなど他のプロパティも必要に応じて保存
-                    // baitInventoryも保存した方が安全
-                    baitInventory: { ...gameState.baitInventory },
-                    baitInventory: { ...gameState.baitInventory },
-                    baitType: gameState.baitType,
-                    selectedSkin: gameState.selectedSkin,
-                    selectedSky: gameState.selectedSky,
-                    skillSets: [...(gameState.skillSets || [])]
-                },
-                rod: {
-                    rankIndex: gameState.rodRankIndex,
-                    rodStarLevels: { ...gameState.rodStarLevels }, // Save per-rod stars
-                    stars: gameState.rodStars, // Backward compatibility
-                    equippedSkills: [...gameState.equippedSkills]
-                },
-                inventory: [...gameState.inventory],
-                unlocked: {
-                    rods: [...gameState.unlockedRods],
-                    skillInventory: { ...gameState.skillInventory },
-                    skins: [...gameState.unlockedSkins],
-                    skies: [...gameState.unlockedSkies]
-                },
-                encyclopedia: { ...gameState.encyclopedia },
-                statistics: {
-                    totalFishCaught: gameState.totalFishCaught,
-                    caughtByRank: { ...gameState.caughtByRank },
-                    totalTreasure: gameState.totalTreasure,
-                    totalSkills: gameState.totalSkills,
-                    totalMoneyEarned: gameState.totalMoneyEarned,
-                    totalCoinsEarned: gameState.totalCoinsEarned,
-                    casinoTotalWin: gameState.casinoTotalWin,
-                    casinoTotalLoss: gameState.casinoTotalLoss,
-                    campaignTotalWin: 0, // 予備
-                    gachaTickets: gameState.gachaTickets,
-                    currentMissionIndex: gameState.currentMissionIndex, // 互換用
-                    missionProgress: gameState.missionProgress,         // 互換用
-                    beginnerMissionCompleted: [...gameState.beginnerMissionCompleted],
-                    beginnerMissionProgress: { ...gameState.beginnerMissionProgress },
-                    dynamicMissions: gameState.dynamicMissions,
-                    dynamicMissionCompletedCount: gameState.dynamicMissionCompletedCount,
-                    biggestFish: gameState.biggestFish,
-                    // フィーバー状態も保存
-                    fever: { ...gameState.fever }
-                }
-            };
+    load() {
+        const data = this._read(this.RUN_KEY);
+        if (!data || data.version !== this.VERSION || !data.run) return null;
+        return data;
+    },
 
-            localStorage.setItem(this.SAVE_KEY, JSON.stringify(saveData));
-            console.log('💾 ゲームデータを保存しました:', saveData.saveDate, 'Mission:', saveData.statistics.currentMissionIndex);
-            return true;
+    hasSaveData() {
+        return this.load() !== null;
+    },
+
+    deleteSave() {
+        try {
+            localStorage.removeItem(this.RUN_KEY);
         } catch (error) {
-            console.error('❌ セーブに失敗しました:', error);
-            return false;
+            console.error('❌ セーブデータの削除に失敗しました:', error);
         }
     },
 
-    // saveGameは予備の名前として追加（UIManagerからの呼び出し対応）
-    saveGame() {
-        // GameStateが渡されていない場合はグローバルなGameStateを使用
-        // ※実際にはsaveメソッドに引数が必要だが、ここでの呼び出し元（UIManager）は引数を渡していない可能性がある
-        // そのため、GameState変数を参照してsaveを呼ぶ
-        return this.save(GameState);
+    // ========================================
+    // メタデータ（図鑑・最高記録）
+    // ========================================
+    loadMeta() {
+        const meta = this._read(this.META_KEY) || {};
+        return {
+            encyclopedia: meta.encyclopedia || {},
+            bestRound: meta.bestRound || 0,   // クリアした最大ラウンド
+            totalRuns: meta.totalRuns || 0,
+            clears: meta.clears || 0          // 航海達成（最終ラウンドクリア）回数
+        };
+    },
+
+    // 航海の結果を記録する。最高記録を更新したら true
+    recordRun(clearedRounds, isNewRun = false, isClear = false) {
+        const meta = this.loadMeta();
+        const isBest = clearedRounds > meta.bestRound;
+        if (isBest) meta.bestRound = clearedRounds;
+        if (isNewRun) meta.totalRuns++;
+        if (isClear) meta.clears++;
+        this._write(this.META_KEY, meta);
+        return isBest;
     },
 
     // ========================================
-    // ロード機能
+    // localStorage の読み書き（失敗してもゲームは止めない）
     // ========================================
-    load() {
+    _read(key) {
         try {
-            const savedData = localStorage.getItem(this.SAVE_KEY);
-            if (!savedData) {
-                console.log('📁 セーブデータが見つかりません');
-                return null;
-            }
-
-            const data = JSON.parse(savedData);
-            console.log('📂 セーブデータを読み込みました:', data.saveDate, 'Mission:', data.statistics?.currentMissionIndex);
-
-            // バージョンチェック・マイグレーション
-            if (data.version !== this.VERSION) {
-                console.log('🔄 データのマイグレーションを実行...');
-                return this.migrate(data);
-            }
-
-            return data;
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
         } catch (error) {
-            console.error('❌ ロードに失敗しました:', error);
+            console.error('❌ ロードに失敗しました:', key, error);
             return null;
         }
     },
 
-    // ========================================
-    // セーブデータの存在チェック
-    // ========================================
-    hasSaveData() {
-        return localStorage.getItem(this.SAVE_KEY) !== null;
-    },
-
-    // ========================================
-    // セーブデータの削除
-    // ========================================
-    deleteSave() {
+    _write(key, data) {
         try {
-            localStorage.removeItem(this.SAVE_KEY);
-            console.log('🗑️ セーブデータを削除しました');
+            localStorage.setItem(key, JSON.stringify(data));
             return true;
         } catch (error) {
-            console.error('❌ 削除に失敗しました:', error);
+            console.error('❌ セーブに失敗しました:', key, error);
             return false;
         }
-    },
-
-    // ========================================
-    // データマイグレーション（将来の互換性用）
-    // ========================================
-    migrate(oldData) {
-        // 現時点では単純にデフォルト値とマージ
-        const defaultData = this.getDefaultData();
-
-        return {
-            ...defaultData,
-            ...oldData,
-            version: this.VERSION,
-            player: { ...defaultData.player, ...oldData.player },
-            rod: { ...defaultData.rod, ...oldData.rod },
-            unlocked: { ...defaultData.unlocked, ...oldData.unlocked },
-            encyclopedia: { ...defaultData.encyclopedia, ...oldData.encyclopedia },
-            statistics: { ...defaultData.statistics, ...oldData.statistics }
-        };
     }
 };
 

@@ -34,24 +34,6 @@ const FishingGame = {
     },
 
     // ========================================
-    // ガチャ開始
-    // ========================================
-    startGacha(results) {
-        this.isGachaMode = true;
-        this.gachaResults = results;
-        UIManager.showScreen('fishing');
-
-        // ガチャ用の初期化
-        this.state = 'idle';
-        this.currentFish = null;
-
-        // 少し待ってから自動キャスト
-        setTimeout(() => {
-            this.cast();
-        }, 500);
-    },
-
-    // ========================================
     // 魚の抽選
     // ========================================
     selectFish() {
@@ -377,14 +359,15 @@ const FishingGame = {
     cast() {
         if (this.state !== 'idle') return false;
 
-        // 餌のチェック (ガチャモードは無視)
-        if (!this.isGachaMode) {
-            const currentBaitCount = GameState.getCurrentBaitCount();
-            if (currentBaitCount === 0) {
-                UIManager.showBaitPurchaseDialog(GameState.baitType);
-                return false;
-            }
+        // 釣りができるのはラウンド中だけ
+        if (!RunManager.canFish()) return false;
+
+        // 選択中の餌が尽きていたら残っている餌に持ち替える。全部尽きていたらラウンド終了判定へ
+        if (!GameState.ensureUsableBait()) {
+            RunManager.checkRoundEnd();
+            return false;
         }
+        UIManager.updateBaitInfo();
 
         this.state = 'casting';
         UIManager.showCasting();
@@ -571,7 +554,7 @@ const FishingGame = {
         this.hitTimer = setTimeout(() => {
             console.log('⏰ ヒット窓口終了: 反応が遅かった');
             // 時間切れで逃げられた
-            this.state = 'idle';
+            this.state = 'result';
             UIManager.showMissed('反応が遅かった！魚に逃げられた...');
 
             // 餌を消費（ヒットを逃した＝失敗）
@@ -594,9 +577,8 @@ const FishingGame = {
             // ========================================
             this.applyFailurePenalty();
 
-
-            // イベント判定
-            this.triggerRandomEvent();
+            // 少し待ってから次の一投へ
+            setTimeout(() => this.endTurn(), 1200);
 
         }, finalHitWindow);
     },
@@ -815,8 +797,6 @@ const FishingGame = {
             // ログ出力
             console.log(`📊 キャッチ判定: ランク差${rankDiff}(${baseRate * 100}%) - パワー罰則${(powerPenalty * 100).toFixed(1)}% = ${(catchRate * 100).toFixed(1)}% (Min 5%)`);
 
-            // 赤ゲージ停止のミッション判定
-            MissionManager.checkMission('red_gauge_stop');
 
         } else {
             // 赤以外は従来通りの設定値
@@ -880,257 +860,79 @@ const FishingGame = {
     catchSuccess() {
         this.state = 'result';
 
-        if (this.isGachaMode) {
-            // ガチャ結果表示へ
-            UIManager.showGachaResult(this.gachaResults, () => {
-                this.isGachaMode = false;
-                this.state = 'idle';
-                UIManager.showScreen('shop'); // ショップへ戻る
-            });
-            return;
-        }
-
         if (!this.currentFish) {
             console.error('❌ currentFish is null in catchSuccess!');
-            this.state = 'idle';
-            UIManager.showIdle();
+            this.endTurn();
             return;
         }
 
-        // 宝箱の場合
-        if (this.currentFish.isTreasure) {
-            // 餌を消費
-            if (GameState.baitType) {
-                GameState.useBait(true);
-                UIManager.updateBaitInfo();
-            }
-
-            // ========================================
-            // フィーバー進行判定
-            // ========================================
-            const feverResult = GameState.progressFever();
-            UIManager.updateFeverVisuals();
-
-            if (feverResult.message === 'start') {
-                UIManager.showMessage(`🔥 ${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
-            } else if (feverResult.message === 'end') {
-                UIManager.showMessage('💨 フィーバー終了...', 3000);
-            }
-
-            GameState.totalTreasure++;
-            // 宝箱取得のミッション判定
-            MissionManager.checkMission('treasure_caught');
-            this.processTreasureChest(this.currentFish);
-            return;
-        }
-
-        // 経験値を獲得 (魚のパワー分)
-        if (this.currentFish) {
-            const xp = Math.floor(this.currentFish.power);
-            GameState.addExp(xp);
-            console.log(`🆙 経験値獲得: ${xp} XP`);
-        }
-
-        // インベントリに追加 (複数釣り判定)
-        let catchCount = 1;
-
-        // 太公望スキル: 常に2倍
-        const isMasterAnglerSpecial = GameState.getEffectsByType('master_angler_special').length > 0;
-        const multiplier = isMasterAnglerSpecial ? 2 : 1;
-
-        const chance3 = GameState.getMultiCatch3Chance();
-        const chance2 = GameState.getMultiCatch2Chance();
-
-        // 優先順位: 3匹 > 2匹
-        if (Math.random() < chance3) {
-            catchCount = 3;
-            console.log('✨ トリプルキャッチ発動！ 3匹ゲット');
-        } else if (Math.random() < chance2) {
-            catchCount = 2;
-            console.log('✨ ダブルキャッチ発動！ 2匹ゲット');
-        }
-
-        catchCount *= multiplier;
-        if (multiplier > 1) console.log(`✨ 太公望効果適用: 釣果 ${multiplier}倍`);
-
-        for (let i = 0; i < catchCount; i++) {
-            GameState.addFish(this.currentFish);
-        }
-
-        // 追加の釣果数ボーナス (マルチキャッチ数+1など)
-        const extraNum = GameState.getMultiCatchBonusNum();
-        if (extraNum > 0 && catchCount > 1) { // 複数釣り発動時のみ有効
-            console.log(`✨ マルチキャッチボーナス: +${extraNum}匹`);
-            catchCount += extraNum;
-            for (let i = 0; i < extraNum; i++) {
-                GameState.addFish(this.currentFish);
-            }
-        }
-
-        // ========================================
-        // 追加ドロップ抽選 (チケット、コイン、スキル)
-        // ========================================
-        const drops = [];
-
-        // 1. ランク・称号に基づく確定/確率ドロップ
-        let dropTicket = 0;
-        let dropCoin = 0;
-        let dropSkill = false;
-
-        // 称号付き: ガチャチケ10枚、コイン、T2以上スキル (確定セット)
-        if (this.currentFish.hasTitle) {
-            console.log('👑 称号ボーナス: 豪華セット獲得！');
-            dropTicket += 10;
-            dropCoin += 1000; // 仮
-            dropSkill = true; // T2以上
-        }
-
-        // 通常ドロップ判定 (ランクが高いほど確率UP)
-        const rankValue = { 'D': 1, 'C': 2, 'B': 3, 'A': 4, 'S': 5, 'SS': 6 };
-        const rVal = rankValue[this.currentFish.rarity] || 1;
-
-        // ガチャチケ (ランクS以上でそこそこの確率)
-        if (this.currentFish.rarity === 'S' || this.currentFish.rarity === 'SS') {
-            if (Math.random() < 0.3) dropTicket += 1;
-        }
-
-        // スキル補正による追加ドロップ
-        // 太公望スキル: ドロップ獲得量2倍
-        const dropMultiplier = isMasterAnglerSpecial ? 2 : 1;
-
-        // Extra Gacha Prob/Num
-        let extraGachaProb = 0;
-        GameState.getEffectsByType('extra_gacha_prob').forEach(eff => extraGachaProb += eff.value);
-
-        // 手応えスキル: ガチャチケット確定
-        if (GameState.getEffectsByType('good_feel').length > 0) extraGachaProb = 1.0;
-
-        if (Math.random() < extraGachaProb) {
-            let num = 1;
-            GameState.getEffectsByType('extra_gacha_num').forEach(eff => num += eff.value);
-            // ... (所持魚数ボーナス等は既存ロジックを期待するが、ここでは簡略化して統合)
-
-            num *= dropMultiplier;
-            dropTicket += num;
-            console.log(`🎫 ドロップ補正適用: チケット+${num}`);
-        }
-
-        // 出張売店スキル判定: 自動売却
-        if (GameState.getEffectsByType('mobile_shop').length > 0) {
-            console.log('💰 出張売店発動: 自動売却実行');
-            setTimeout(() => {
-                GameState.sellAllFish();
-                if (UIManager.updateStatus) UIManager.updateStatus();
-            }, 1500);
-        }
-
-        // Extra Coin Prob/Amount
-        let extraCoinProb = 0;
-        // extra_coin_prob
-        GameState.equippedSkills.forEach(id => {
-            const s = GAME_DATA.SKILLS.find(sk => sk.id === id);
-            if (s && s.effect.type === 'extra_coin_prob') extraCoinProb += s.effect.value;
-        });
-
-        if (Math.random() < extraCoinProb) {
-            let amount = 100; // ベース
-            // extra_coin_amount補正
-            let amountMult = 1.0;
-            GameState.equippedSkills.forEach(id => {
-                const s = GAME_DATA.SKILLS.find(sk => sk.id === id);
-                if (s && s.effect.type === 'extra_coin_amount') amountMult += s.effect.value;
-            });
-            // Count Gacha Coin
-            GameState.equippedSkills.forEach(id => {
-                const s = GAME_DATA.SKILLS.find(sk => sk.id === id);
-                if (s && s.effect.type === 'count_gacha_coin') {
-                    const ticketCount = GameState.gachaTickets || 0;
-                    amountMult += (ticketCount * s.effect.value);
-                }
-            });
-
-            // 永遠の熱狂 (Eternal Fever) 報酬倍率
-            const feverMult = GameState.getFeverRewardMultiplier();
-            dropCoin = Math.floor(dropCoin * amountMult * feverMult);
-            console.log(`💰 スキル効果: コイン+${dropCoin} (Fever x${feverMult})`);
-        }
-
-
-        // ドロップ処理実行
-        if (dropTicket > 0) {
-            // 永遠の熱狂 (Eternal Fever) 報酬倍率
-            const feverMult = GameState.getFeverRewardMultiplier();
-            const finalTickets = Math.floor(dropTicket * feverMult);
-            GameState.gachaTickets += finalTickets;
-            drops.push({ type: 'ticket', count: finalTickets, name: 'ガチャチケ' });
-        }
-        if (dropCoin > 0) {
-            GameState.addMoney(dropCoin);
-            drops.push({ type: 'money', count: dropCoin, name: `${dropCoin} G` });
-        }
-        if (dropSkill) {
-            // T2以上のスキルをランダムに1つ
-            const t2Skills = GAME_DATA.SKILLS.filter(s => s.tier >= 2);
-            if (t2Skills.length > 0) {
-                const s = t2Skills[Math.floor(Math.random() * t2Skills.length)];
-                GameState.addSkill(s.id); // addSkillは未実装なら gainGachaResult 的な処理が必要
-                // GameState.skillInventoryに直接追加するか、gainGachaResultを使う
-                if (GameState.skillInventory) {
-                    GameState.skillInventory[s.id] = (GameState.skillInventory[s.id] || 0) + 1;
-                    drops.push({ type: 'skill', count: 1, name: s.name });
-                }
-            }
-        }
-
-        // Drops情報をUIに渡す（必要ならshowCatchSuccessの引数を拡張）
-        // if (drops.length > 0) {
-        //     // 簡易的にメッセージで表示 (廃止: showCatchSuccessに統合)
-        //     // const dropNames = drops.map(d => `${d.name} x${d.count}`).join(', ');
-        //     // UIManager.showMessage(`🎁 追加報酬: ${dropNames}`, 3000);
-        // }
-
-        // 初心者ミッション判定 + 動的ミッション判定（魚情報付き）
-        MissionManager.checkMission('catch_success', {
-            baitId: GameState.baitType,
-            rarity: this.currentFish.rarity,
-            frequency: this.currentFish.frequency
-        });
+        const fish = this.currentFish;
 
         // 餌を消費
-        if (GameState.baitType) {
-            const baitData = GAME_DATA.BAITS.find(b => b.id === GameState.baitType);
-            const baitRank = baitData ? baitData.rank : 'D';
-            GameState.useBait(true);
-            UIManager.updateBaitInfo();
-            // 餌使用のミッション判定
-            MissionManager.checkMission('use_bait', { rank: baitRank });
-        }
+        GameState.useBait(true);
+        UIManager.updateBaitInfo();
 
-        // ========================================
-        // フィーバー進行判定
-        // ========================================
+        // フィーバー進行
         const feverResult = GameState.progressFever();
         UIManager.updateFeverVisuals();
-
         if (feverResult.message === 'start') {
             UIManager.showMessage(`🔥 ${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
-            // フィーバー開始ミッション判定
-            MissionManager.checkMission('fever_start');
         } else if (feverResult.message === 'end') {
             UIManager.showMessage('💨 フィーバー終了...', 3000);
         }
 
-        // UI表示（ユーザーが閉じたらidleに戻る）
-        UIManager.showCatchSuccess(this.currentFish, () => {
-            this.state = 'idle';
-            UIManager.showIdle();
-            // イベント判定
-            this.triggerRandomEvent();
-        }, catchCount, drops); // dropsを渡す
+        // 宝箱の場合
+        if (fish.isTreasure) {
+            GameState.totalTreasure++;
+            this.processTreasureChest(fish);
+            return;
+        }
 
-        console.log(`🎉 ${this.currentFish.name}を釣り上げた！ (x${catchCount})`);
+        // ----------------------------------------
+        // 釣果数（マルチキャッチ）
+        // ----------------------------------------
+        let catchCount = 1;
+        if (Math.random() < GameState.getMultiCatch3Chance()) {
+            catchCount = 3;
+        } else if (Math.random() < GameState.getMultiCatch2Chance()) {
+            catchCount = 2;
+        }
+
+        // 複数釣り発動時のみ有効な追加ボーナス
+        if (catchCount > 1) {
+            catchCount += GameState.getMultiCatchBonusNum();
+        }
+
+        // 太公望スキル: 釣果が常に2倍
+        if (GameState.getEffectsByType('master_angler_special').length > 0) {
+            catchCount *= 2;
+        }
+
+        for (let i = 0; i < catchCount; i++) {
+            GameState.recordCatch(fish);
+        }
+
+        // ----------------------------------------
+        // その場で売却して水揚げ額に加算
+        // ----------------------------------------
+        const earned = GameState.getSalePrice(fish) * catchCount;
+        GameState.addMoney(earned);
+
+        // 称号付き: ボーナスとしてTier2以上のスキルを1つ
+        const drops = [];
+        if (fish.hasTitle) {
+            const bonusSkill = RunManager.pickSkill({ minTier: 2 });
+            if (bonusSkill) {
+                GameState.addSkill(bonusSkill.id);
+                drops.push({ type: 'skill', count: 1, name: bonusSkill.name });
+            }
+        }
+
+        UIManager.updateStatus();
+        UIManager.showCatchSuccess(fish, () => this.endTurn(true), catchCount, drops, earned);
+
+        console.log(`🎉 ${fish.name}を釣り上げた！ (x${catchCount}) +${earned}G`);
     },
-
     // ========================================
     // 早すぎるクリックで失敗
     // ========================================
@@ -1138,12 +940,10 @@ const FishingGame = {
         this.state = 'result';
 
         // 餌を消費
-        if (GameState.baitType) {
-            GameState.useBait(false);
-            UIManager.updateBaitInfo();
-        }
+        GameState.useBait(false);
+        UIManager.updateBaitInfo();
 
-        // フィーバー中は失敗でもゲージが溜まる
+        // フィーバー中は失敗でもゲージが進む
         if (GameState.fever.isActive) {
             const feverResult = GameState.progressFever(true);
             UIManager.updateFeverVisuals();
@@ -1152,24 +952,14 @@ const FishingGame = {
             }
         }
 
-        // ========================================
-        // 失敗ペナルティ (Early Click)
-        // ========================================
         this.applyFailurePenalty();
 
-        // UI表示（簡易メッセージ）
         UIManager.showMissed('タイミングが早すぎた！');
-
         console.log('💔 タイミングが早すぎた！');
 
-        // 少し待ってから待機状態に戻る
-        setTimeout(() => {
-            this.state = 'idle';
-            this.currentFish = null;
-            UIManager.showIdle();
-        }, 1500);
+        // 少し待ってから次の一投へ
+        setTimeout(() => this.endTurn(), 1500);
     },
-
     // ========================================
     // 釣り上げ失敗
     // ========================================
@@ -1180,44 +970,46 @@ const FishingGame = {
         this.state = 'result';
 
         // 餌を消費
-        if (GameState.baitType) {
-            GameState.useBait(false);
-            UIManager.updateBaitInfo();
-        }
+        GameState.useBait(false);
+        UIManager.updateBaitInfo();
 
         // 失敗時は確定でフィーバーゲージ+1
         const feverResult = GameState.progressFever(true);
         UIManager.updateFeverVisuals();
-
         if (feverResult.message === 'start') {
             UIManager.showMessage(`🔥 ${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
         }
 
-        // ========================================
-        // 失敗ペナルティ (Catch Failed)
-        // ========================================
         if (!skipPenalty) {
             this.applyFailurePenalty();
         }
 
-        // UI表示（ユーザーが閉じたらidleに戻る）
         if (this.currentFish) {
-            UIManager.showCatchFailed(this.currentFish, () => {
-                this.state = 'idle';
-                UIManager.showIdle();
-            });
+            // ユーザーが閉じたら次の一投へ
+            UIManager.showCatchFailed(this.currentFish, () => this.endTurn());
             console.log(`💔 ${this.currentFish.name}に逃げられた...`);
         } else {
             UIManager.showMissed('魚に逃げられた...');
-            console.log('💔 魚に逃げられた...');
-            // showMissedはタイムアウトで戻る
-            setTimeout(() => {
-                this.state = 'idle';
-                UIManager.showIdle();
-            }, 1500);
+            setTimeout(() => this.endTurn(), 1500);
         }
     },
 
+    // ========================================
+    // 一投の後始末
+    // ラウンドの決着（目標達成・餌切れ）を判定し、続行なら待機状態に戻る
+    // ========================================
+    endTurn(allowEvent = false) {
+        this.state = 'idle';
+        this.currentFish = null;
+        GameState.ensureUsableBait(); // 使い切った餌を選んだままにしない
+        UIManager.showIdle();
+        UIManager.updateStatus();
+        SaveManager.save();
+
+        if (RunManager.checkRoundEnd()) return;
+
+        if (allowEvent) this.triggerRandomEvent();
+    },
     // ========================================
     // タイマー・アニメーションのクリーンアップ
     // ========================================
@@ -1238,16 +1030,6 @@ const FishingGame = {
         // 今回はcleanupTimersは「釣りサイクルの一連の流れ」のクリアなので、
         // グローバルなイベントループはここでは止めないでおくが、
         // 念のためプロパティは定義しておく
-    },
-
-    // ========================================
-    // イベントループ停止（画面遷移時など）
-    // ========================================
-    stopRandomEventLoop() {
-        if (this.eventTimer) {
-            clearTimeout(this.eventTimer);
-            this.eventTimer = null;
-        }
     },
 
     // ========================================
@@ -1370,11 +1152,8 @@ const FishingGame = {
 
                     if (Math.random() < effectiveChance) {
                         // 指定Tierのスキルからランダムに1つ
-                        const availableSkills = GAME_DATA.SKILLS.filter(s => s.tier === skillConfig.tier);
-                        if (availableSkills.length > 0) {
-                            const newSkill = availableSkills[Math.floor(Math.random() * availableSkills.length)];
-
-                            // 既に持っているかチェック
+                        const newSkill = RunManager.pickSkill({ tier: skillConfig.tier });
+                        if (newSkill) {
                             GameState.addSkill(newSkill.id);
                             results.push({ type: 'skill', id: newSkill.id, name: newSkill.name });
                         }
@@ -1439,10 +1218,8 @@ const FishingGame = {
         console.log('🎁 宝箱の中身:', results);
 
         // UI表示
-        UIManager.showTreasureResult(chest, results, () => {
-            this.state = 'idle';
-            UIManager.showIdle();
-        });
+        UIManager.updateStatus();
+        UIManager.showTreasureResult(chest, results, () => this.endTurn());
     },
 
     // ========================================
@@ -1524,24 +1301,13 @@ const FishingGame = {
     applyFailurePenalty() {
         const penalty = GameState.getPenaltyStatus();
 
-        if (penalty.ultimateRisk) {
-            console.log('💀 Ultimate Risk発動: インベントリ全消失');
-            GameState.inventory = [];
-            UIManager.showMessage('💀 全魚ロスト...', 3000);
-            // オートセーブ
-            SaveManager.save(GameState);
-        }
-
+        // 闇取引: 失敗すると所持金の一部を失う
         if (penalty.highRiskSell) {
-            const lossRate = 0.1; // 10%減少と仮定（または固定額）
-            const loss = Math.floor(GameState.money * lossRate);
+            const loss = Math.floor(GameState.money * 0.1);
             if (loss > 0) {
                 GameState.money -= loss;
-                console.log(`💸 High Risk Penalty: -${loss}G`);
                 UIManager.showMessage(`💸 ペナルティ: -${loss}G`, 3000);
-                // UI更新
                 UIManager.updateMoney();
-                SaveManager.save(GameState);
             }
         }
     }

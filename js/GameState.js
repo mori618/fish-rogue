@@ -1,89 +1,63 @@
 // ゲーム状態管理
-// プレイヤーの現在の状態を一元管理
+// 1回の航海（ラン）中のプレイヤー状態を一元管理する。
+// ラウンド進行そのものは RunManager が担当する。
 
 const GameState = {
     // ========================================
     // 基本ステータス
     // ========================================
     money: 0,
-    baitInventory: {},
+    baitInventory: {},   // { bait_d: 10, bait_c: 3, ... } すべて有限
     baitType: 'bait_d',
 
-    // ========================================
-    // ランク (Rank)
-    // ========================================
+    // ランク（旧仕様の互換用。ローグライト版では常に1）
     rank: 1,
-    exp: 0,
-    rankUpDialogQueue: [], // ランクアップ表示待ち行列
+
+    // ========================================
+    // 航海（ラン）の進行状況
+    // ========================================
+    run: null,  // { round, target, earned, phase, offers, ... } 詳細は RunManager.createRun
 
     // ========================================
     // 釣り竿の状態
     // ========================================
     rodRankIndex: 0,
-    rodStarLevels: {},  // インデックスごとの星数 { 0: 0, 1: 0 }
+    rodStarLevels: {},  // 竿インデックスごとの星数 { 0: 2, 1: 0 }
+    unlockedRods: [0],
     equippedSkills: [],
-    skillSets: [], // 保存されたスキルセット { name: string, skills: string[] }
+    skillInventory: {}, // IDごとの所持数 { "power_up_1": 2 }
+    customSkills: {},   // 互換用（合成スキル。ローグライト版では未使用）
 
-    // Getter for backward compatibility (current rod's stars)
     get rodStars() {
         return this.rodStarLevels[this.rodRankIndex] || 0;
     },
 
     set rodStars(value) {
-        // Setter for migration or simple assignment
         this.rodStarLevels[this.rodRankIndex] = value;
     },
 
     // ========================================
-    // イベント状態
+    // イベント・見た目
     // ========================================
     highTierGuaranteed: false, // 鳥イベント用：次回上位魚確定フラグ
+    selectedSky: 'sky_default',
 
-    // ========================================
-    // インベントリ（釣った魚）
-    // ========================================
+    // 旧仕様の互換用（所持魚・チケットに依存するスキル計算が参照する）
     inventory: [],
+    gachaTickets: 0,
 
     // ========================================
-    // 図鑑データ
+    // 図鑑（航海をまたいで引き継ぐ）
     // ========================================
     encyclopedia: {},
 
     // ========================================
-    // アンロック状態
-    // ========================================
-    unlockedRods: [0],
-    unlockedSkins: ['skin_default'],
-    selectedSkin: 'skin_default',
-    skillInventory: {}, // IDごとの所持数 { "power_up_1": 3 }
-    // unlockedSkills: [], // 廃止予定 (移行用コードで処理)
-    unlockedSkies: ['sky_default'],
-    selectedSky: 'sky_default',
-    customSkills: {}, // 合成で作られたスキルの詳細データ { "hybrid_id": { name, effect: { effects: [...] } } }
-
-    // ========================================
-    // 統計情報
+    // この航海の統計
     // ========================================
     totalFishCaught: 0,
     caughtByRank: { 'D': 0, 'C': 0, 'B': 0, 'A': 0, 'S': 0, 'SS': 0 },
     totalTreasure: 0,
-    totalSkills: 0,
     totalMoneyEarned: 0,
-    totalCoinsEarned: 0, // 売却などで獲得した純粋な利益累計
-    casinoTotalWin: 0,
-    casinoTotalLoss: 0,
-    gachaTickets: 0,
-    currentMissionIndex: 0, // 現在のミッション番号 (廃止予定/互換用)
-    missionProgress: 0,     // カウントが必要なミッションの進捗 (廃止予定/互換用)
-
-    // 新しいミッション管理
-    beginnerMissionCompleted: [], // 完了したミッションIDのリスト
-    beginnerMissionProgress: {},  // ミッションIDごとの進捗 { "catch_3": 1 }
-
-    // 動的ミッションデータ
-    dynamicMissions: null,   // { A: {...}, B: {...}, C: {...} }
-    dynamicMissionCompletedCount: 0, // 達成ミッション数（C枠の「ミッションをN個達成する」用）
-
     biggestFish: null,
 
     // ========================================
@@ -96,223 +70,226 @@ const GameState = {
     },
 
     // ========================================
-    // 港（Port）状態
-    // ========================================
-    port: {
-        ownedShipId: null,
-        fuelMinutes: 0,
-        stock: [],
-        lastProcessTime: Date.now()
-    },
-
-
-
-    // ========================================
     // 初期化
+    // saveData があれば中断した航海を復元、なければ新しい航海用にリセット
     // ========================================
     init(saveData = null) {
-        if (saveData) {
-            // セーブデータから復元
-            this.money = saveData.player.money;
-            this.highTierGuaranteed = false; // ロード時はリセット
-            // 互換性チェック: 古いデータの場合は移行
-            if (saveData.player.baitInventory) {
-                this.baitInventory = { ...saveData.player.baitInventory };
-                // 強制的にDランクは無限(-1)にする（バグ修正・保護）
-                this.baitInventory['bait_d'] = -1;
-            } else {
-                // 旧データからの移行: 持っていた餌を現在の餌タイプに追加
-                this.baitInventory = {
-                    'bait_d': -1, // -1は無限
-                    'bait_c': 0,
-                    'bait_b': 0,
-                    'bait_a': 0,
-                    'bait_s': 0
-                };
-                if (saveData.player.baitType && saveData.player.baitCount > 0) {
-                    this.baitInventory[saveData.player.baitType] = saveData.player.baitCount;
-                }
+        const s = saveData || {};
+
+        this.money = s.money || 0;
+        this.baitInventory = { bait_d: 0, bait_c: 0, bait_b: 0, bait_a: 0, bait_s: 0, ...(s.baitInventory || {}) };
+        this.baitType = s.baitType || 'bait_d';
+        this.rank = 1;
+        this.run = s.run ? JSON.parse(JSON.stringify(s.run)) : null;
+
+        this.rodRankIndex = s.rodRankIndex || 0;
+        this.rodStarLevels = { 0: 0, ...(s.rodStarLevels || {}) };
+        this.unlockedRods = [...(s.unlockedRods || [0])];
+        this.equippedSkills = [...(s.equippedSkills || [])];
+        this.skillInventory = { ...(s.skillInventory || {}) };
+        this.customSkills = {};
+
+        this.highTierGuaranteed = false;
+        this.selectedSky = s.selectedSky || 'sky_default';
+        this.inventory = [];
+        this.gachaTickets = 0;
+
+        // 図鑑は航海をまたぐメタデータから読む
+        this.encyclopedia = { ...SaveManager.loadMeta().encyclopedia };
+
+        this.totalFishCaught = s.totalFishCaught || 0;
+        this.caughtByRank = { 'D': 0, 'C': 0, 'B': 0, 'A': 0, 'S': 0, 'SS': 0, ...(s.caughtByRank || {}) };
+        this.totalTreasure = s.totalTreasure || 0;
+        this.totalMoneyEarned = s.totalMoneyEarned || 0;
+        this.biggestFish = s.biggestFish || null;
+
+        this.fever = { isActive: false, value: 0, type: null, ...(s.fever || {}) };
+    },
+
+    // ========================================
+    // お金
+    // 釣り中に得たお金はすべてラウンドの水揚げ額にも加算される
+    // ========================================
+    addMoney(amount) {
+        this.money += amount;
+        if (amount > 0) {
+            this.totalMoneyEarned += amount;
+            if (this.run && this.run.phase === 'fishing') {
+                this.run.earned += amount;
             }
-            this.baitType = saveData.player.baitType || 'bait_d';
+        }
+    },
 
-            this.rodRankIndex = saveData.rod.rankIndex;
+    spendMoney(amount) {
+        if (this.money < amount) return false;
+        this.money -= amount;
+        return true;
+    },
 
-            this.rank = saveData.player.rank || 1;
-            this.exp = saveData.player.exp || 0;
+    // ========================================
+    // スキルスロット数
+    // 基本値 + 竿の購入・星強化の累計 + 拡張スキル
+    // ========================================
+    getSkillSlots() {
+        const cfg = GAME_DATA.ROGUE_CONFIG;
+        let slots = cfg.baseSkillSlots + (this.unlockedRods.length - 1);
+        Object.values(this.rodStarLevels).forEach(stars => slots += stars);
 
-            // ----------------新形式データ
-            // 竿レベルの移行ロジック
-            // ----------------------------------------
-            if (saveData.rod.rodStarLevels) {
-                // 新形式データ
-                this.rodStarLevels = { ...saveData.rod.rodStarLevels };
-            } else {
-                // 旧形式からの移行:
-                // 現在持っていた星の数を、現在アンロックされている全ての竿に適用（救済措置）
-                const oldStars = saveData.rod.stars || 0;
-                this.rodStarLevels = {};
-                (saveData.unlocked.rods || [0]).forEach(rodId => {
-                    this.rodStarLevels[rodId] = oldStars;
-                });
-                console.log(`🔄 竿レベル移行完了: 全アンロック竿に星${oldStars}個を適用`);
-            }
+        this.getEffectsByType('skill_slot_expansion').forEach(effect => {
+            slots += effect.value;
+        });
 
-            this.equippedSkills = [...saveData.rod.equippedSkills];
+        return Math.min(slots, cfg.maxSkillSlots);
+    },
 
-            // スキルセットの復元
-            if (saveData.player && saveData.player.skillSets) {
-                this.skillSets = [...saveData.player.skillSets];
-            } else {
-                this.skillSets = [];
-            }
-
-            this.inventory = [...saveData.inventory];
-
-            this.unlockedRods = [...saveData.unlocked.rods];
-            // データ不整合防止: unlockedRodsにあるものは確実に初期化
-            this.unlockedRods.forEach(rodId => {
-                if (typeof this.rodStarLevels[rodId] === 'undefined') {
-                    this.rodStarLevels[rodId] = 0;
-                }
-            });
-
-            // カスタムスキルの復元
-            if (saveData.unlocked.customSkills) {
-                this.customSkills = { ...saveData.unlocked.customSkills };
-            } else {
-                this.customSkills = {};
-            }
-
-            // スキルデータの移行
-            if (saveData.unlocked.skillInventory) {
-                this.skillInventory = { ...saveData.unlocked.skillInventory };
-            } else if (saveData.unlocked.skills) {
-                // 旧データからの移行: 持っていたスキルを各1個所持として登録
-                this.skillInventory = {};
-                saveData.unlocked.skills.forEach(skillId => {
-                    this.skillInventory[skillId] = 1;
-                });
-            } else {
-                this.skillInventory = {};
-            }
-
-            this.totalFishCaught = saveData.statistics.totalFishCaught || 0;
-            this.caughtByRank = saveData.statistics.caughtByRank || { 'D': 0, 'C': 0, 'B': 0, 'A': 0, 'S': 0, 'SS': 0 };
-            this.totalTreasure = saveData.statistics.totalTreasure || 0;
-            this.totalSkills = saveData.statistics.totalSkills || 0;
-            this.totalMoneyEarned = saveData.statistics.totalMoneyEarned || 0;
-            this.totalCoinsEarned = saveData.statistics.totalCoinsEarned || 0;
-            this.casinoTotalWin = saveData.statistics.casinoTotalWin || 0;
-            this.casinoTotalLoss = saveData.statistics.casinoTotalLoss || 0;
-            this.gachaTickets = saveData.statistics.gachaTickets || 0;
-            // console.log('Load Mission Index:', saveData.statistics.currentMissionIndex);
-            this.currentMissionIndex = saveData.statistics.currentMissionIndex ?? 0;
-
-            // --- ミッションデータの移行と復元 ---
-            this.currentMissionIndex = saveData.statistics.currentMissionIndex ?? 0; // 旧データ保持用
-
-            // 新しいミッションデータ構造
-            this.beginnerMissionCompleted = saveData.statistics.beginnerMissionCompleted || [];
-            this.beginnerMissionProgress = saveData.statistics.beginnerMissionProgress || {};
-
-            // 旧データからの移行: currentMissionIndex があり、かつ新データが空の場合
-            if (this.currentMissionIndex > 0 && this.beginnerMissionCompleted.length === 0) {
-                // MissionManagerがまだロードされていない可能性があるため、インデックスベースで仮IDを生成するか、
-                // あるいは単純に数値で管理していたものをIDリストに変換する必要がある。
-                // ここではMissionManager.MISSIONSのIDが ["help", "catch_1", "go_town", ...] であると仮定して処理するが、
-                // GameState単体ではIDを知り得ないため、本来はMissionManager側でマイグレーションすべきかもしれない。
-                // しかし、簡便のため、MissionManagerがロード済みであることを期待するか、
-                // または後でMissionManager初期化時に修正する。
-                // 
-                // 安全策: ここでは空のままにしておき、MissionManager.migrate() のようなメソッドで後で処理するフックを用意するか、
-                // 単純に定義済みのIDリストをハードコードして移行する。
-
-                const legacyMissionIds = ['help', 'catch_1', 'go_town', 'buy_bait', 'catch_with_bait', 'equip_skill', 'catch_3'];
-
-                // 完了済みミッションを追加
-                for (let i = 0; i < this.currentMissionIndex; i++) {
-                    if (i < legacyMissionIds.length) {
-                        this.beginnerMissionCompleted.push(legacyMissionIds[i]);
-                    }
-                }
-
-                // 現在進行中のミッションの進捗を移行
-                if (this.currentMissionIndex < legacyMissionIds.length) {
-                    const currentId = legacyMissionIds[this.currentMissionIndex];
-                    if (saveData.statistics.missionProgress > 0) {
-                        this.beginnerMissionProgress[currentId] = saveData.statistics.missionProgress;
-                    }
-                }
-
-                console.log('🔄 ミッションデータを新形式に移行しました:', this.beginnerMissionCompleted, this.beginnerMissionProgress);
-            }
-
-            this.missionProgress = saveData.statistics.missionProgress ?? 0; // 旧互換用
-
-            this.dynamicMissions = saveData.statistics.dynamicMissions ?? null;
-            this.dynamicMissionCompletedCount = saveData.statistics.dynamicMissionCompletedCount ?? 0;
-            this.biggestFish = saveData.statistics.biggestFish;
-
-            // 図鑑データを復元
-            this.encyclopedia = saveData.encyclopedia ? { ...saveData.encyclopedia } : {};
-
-            // スキン状態の復元
-            this.unlockedSkins = saveData.unlocked.skins || ['skin_default'];
-            this.selectedSkin = saveData.player.selectedSkin || 'skin_default';
-            this.unlockedSkies = saveData.unlocked.skies || ['sky_default'];
-            this.selectedSky = saveData.player.selectedSky || 'sky_default';
-
-            // 港データの復元
-            if (saveData.port) {
-                this.port = {
-                    ownedShipId: saveData.port.ownedShipId || null,
-                    fuelMinutes: saveData.port.fuelMinutes || 0,
-                    stock: saveData.port.stock || [],
-                    lastProcessTime: saveData.port.lastProcessTime || Date.now()
-                };
-            } else {
-                // 既存データへの追加
-                this.port = {
-                    ownedShipId: null,
-                    fuelMinutes: 0,
-                    stock: [],
-                    lastProcessTime: Date.now()
-                };
-            }
-        } else {
-            // 新規ゲーム
-            const defaultData = SaveManager.getDefaultData();
-            this.init(defaultData);
-
-            // 初期在庫の設定
-            this.baitInventory = {
-                'bait_d': -1, // 無限
-                'bait_c': 0,
-                'bait_b': 0,
-                'bait_a': 0,
-                'bait_s': 0
-            };
-            this.baitType = 'bait_d';
-
-            this.rank = 1;
-            this.exp = 0;
-            // 初期スキン
-            this.unlockedSkins = ['skin_default'];
-            this.selectedSkin = 'skin_default';
-            this.unlockedSkies = ['sky_default'];
-            this.selectedSky = 'sky_default';
-            // 初期港データ
-            this.port = {
-                ownedShipId: null,
-                fuelMinutes: 0,
-                stock: [],
-                lastProcessTime: Date.now()
-            };
-            this.customSkills = {};
+    // ========================================
+    // 魚を釣り上げた記録（図鑑・統計）
+    // 売却は自動なのでインベントリには入れない
+    // ========================================
+    recordCatch(fish) {
+        if (!this.encyclopedia[fish.id]) {
+            this.encyclopedia[fish.id] = { count: 0, hasSpecial: false, specialCount: 0 };
+        }
+        const entry = this.encyclopedia[fish.id];
+        entry.count++;
+        if (fish.hasTitle) {
+            entry.hasSpecial = true;
+            entry.specialCount = (entry.specialCount || 0) + 1;
         }
 
+        this.totalFishCaught++;
+        if (this.caughtByRank[fish.rarity] !== undefined) {
+            this.caughtByRank[fish.rarity]++;
+        }
+        if (!this.biggestFish || fish.power > this.biggestFish.power) {
+            this.biggestFish = { name: fish.name, power: fish.power };
+        }
+    },
 
-        console.log('🎮 ゲーム状態を初期化しました');
+    // 魚1匹あたりの売値（スキル補正込み）
+    getSalePrice(fish) {
+        return Math.floor(fish.price * (1 + this.getPriceBonus()));
+    },
+
+    // ========================================
+    // 餌
+    // ========================================
+    getBaitCount(baitId) {
+        return this.baitInventory[baitId] || 0;
+    },
+
+    getTotalBaitCount() {
+        return Object.values(this.baitInventory).reduce((sum, n) => sum + Math.max(0, n), 0);
+    },
+
+    addBait(baitId, amount) {
+        if (!amount || amount <= 0) return;
+        this.baitInventory[baitId] = this.getBaitCount(baitId) + amount;
+    },
+
+    // 所持している餌の中で切り替える（direction: +1 / -1）
+    switchBait(direction) {
+        const owned = GAME_DATA.BAITS.filter(b => this.getBaitCount(b.id) > 0 || b.id === this.baitType);
+        if (owned.length <= 1) return;
+        const index = owned.findIndex(b => b.id === this.baitType);
+        this.baitType = owned[(index + direction + owned.length) % owned.length].id;
+    },
+
+    // 選択中の餌が尽きていたら、残っている一番下のランクの餌に持ち替える
+    // 持ち替え先が無ければ false
+    ensureUsableBait() {
+        if (this.getBaitCount(this.baitType) > 0) return true;
+        const next = GAME_DATA.BAITS.find(b => this.getBaitCount(b.id) > 0);
+        if (!next) return false;
+        this.baitType = next.id;
+        return true;
+    },
+
+    // 餌を1つ消費する。成功時のみ「餌の達人」で消費を免れることがある
+    useBait(isSuccess = true) {
+        if (this.getBaitCount(this.baitType) <= 0) return false;
+
+        if (isSuccess && Math.random() < this.getBaitSaveChance()) {
+            console.log('✨ 餌の達人発動！');
+            return true;
+        }
+
+        this.baitInventory[this.baitType]--;
+        return true;
+    },
+
+    // ========================================
+    // 釣り竿（購入・強化）
+    // 価格は原作の値に ROGUE_CONFIG.costMult を掛けたもの
+    // ========================================
+    getRodPrice(rodIndex) {
+        const rod = GAME_DATA.RODS[rodIndex];
+        const base = rod.price * GAME_DATA.ROGUE_CONFIG.costMult.rod;
+        return Math.floor(base * (1.0 - this.getShopDiscount()));
+    },
+
+    // 次の竿に買い替える（買ったらそのまま持ち替える）
+    buyNextRod() {
+        const nextIndex = this.rodRankIndex + 1;
+        if (!GAME_DATA.RODS[nextIndex]) return false;
+        if (!this.spendMoney(this.getRodPrice(nextIndex))) return false;
+
+        this.unlockedRods.push(nextIndex);
+        this.rodStarLevels[nextIndex] = 0;
+        this.rodRankIndex = nextIndex;
+        return true;
+    },
+
+    getUpgradeCost() {
+        if (this.rodStars >= 5) return null;
+        const base = this.getCurrentRod().upgradeCosts[this.rodStars] * GAME_DATA.ROGUE_CONFIG.costMult.upgrade;
+        return Math.floor(base * this.getUpgradeCostModifier());
+    },
+
+    upgradeRod() {
+        const cost = this.getUpgradeCost();
+        if (cost === null || !this.spendMoney(cost)) return false;
+        this.rodStars++;
+        return true;
+    },
+
+    // 竿の見た目（装備中の竿に対応するスキン）
+    getCurrentSkin() {
+        const rodId = this.getCurrentRod().id;
+        return GAME_DATA.SKINS.find(skin => skin.rodId === rodId) || GAME_DATA.SKINS[0];
+    },
+
+    // ========================================
+    // スキルの入手・売却
+    // ========================================
+    // スキルを入手する。スロットが空いていれば自動で装備する
+    addSkill(skillId) {
+        this.skillInventory[skillId] = (this.skillInventory[skillId] || 0) + 1;
+        if (this.equippedSkills.length < this.getSkillSlots()) {
+            this.equippedSkills.push(skillId);
+        }
+    },
+
+    // スキルを1つ手放す（装備していない分から優先して減らす）
+    removeSkill(skillId) {
+        const owned = this.getSkillCount(skillId);
+        if (owned <= 0) return false;
+
+        if (this.getEquippedSkillCount(skillId) >= owned) {
+            this.equippedSkills.splice(this.equippedSkills.indexOf(skillId), 1);
+        }
+        if (owned === 1) delete this.skillInventory[skillId];
+        else this.skillInventory[skillId] = owned - 1;
+
+        this.trimEquippedSkills();
+        return true;
+    },
+
+    // スロット数を超えた装備を後ろから外す（拡張スキルを外した時など）
+    trimEquippedSkills() {
+        while (this.equippedSkills.length > this.getSkillSlots()) {
+            this.equippedSkills.pop();
+        }
     },
 
     // ========================================
@@ -330,40 +307,6 @@ const GameState = {
         return GAME_DATA.RODS[this.rodRankIndex] || GAME_DATA.RODS[0];
     },
 
-    // お金操作
-    addMoney(amount) {
-        this.money += amount;
-        if (amount > 0) {
-            this.totalMoneyEarned += amount;
-            this.totalCoinsEarned += amount;
-            // コイン獲得ミッション判定
-            if (typeof MissionManager !== 'undefined') {
-                MissionManager.checkMission('money_earned', { amount: amount });
-            }
-        }
-    },
-
-    // 借金状態の確認
-    getDebt() {
-        return this.money < 0 ? Math.abs(this.money) : 0;
-    },
-
-    hasDebt() {
-        return this.money < 0;
-    },
-
-    getCurrentRod() {
-        return GAME_DATA.RODS[this.rodRankIndex];
-    },
-
-    // ガチャチケットを獲得
-    addGachaTickets(amount) {
-        if (amount <= 0) return;
-        this.gachaTickets += amount;
-        if (typeof UIManager !== 'undefined' && UIManager.updateStatus) {
-            UIManager.updateStatus();
-        }
-    },
 
     // 現在の総合パワーを計算
     // ========================================
@@ -424,128 +367,6 @@ const GameState = {
         }
 
         return power;
-    },
-
-    // ========================================
-    // スキルスロット数（＝星の数）
-    // ========================================
-    getSkillSlots() {
-        let slots = this.rodStars + 1;
-
-        // スキルによる拡張
-        const slotEffects = this.getEffectsByType('skill_slot_expansion');
-        slotEffects.forEach(effect => {
-            slots += effect.value;
-        });
-
-        return slots;
-    },
-
-    // ========================================
-    // スキルセット操作
-    // ========================================
-
-    // 現在の装備をセットとして保存
-    saveCurrentSkillSet(name) {
-        if (!name) return false;
-
-        // 同じ名前があれば上書き、なければ追加
-        const existingIndex = this.skillSets.findIndex(set => set.name === name);
-        const newSet = {
-            name: name,
-            skills: [...this.equippedSkills]
-        };
-
-        if (existingIndex >= 0) {
-            this.skillSets[existingIndex] = newSet;
-            console.log(`💾 スキルセット更新: ${name}`);
-        } else {
-            this.skillSets.push(newSet);
-            console.log(`💾 新規スキルセット保存: ${name}`);
-        }
-
-        // 保存
-        if (typeof SaveManager !== 'undefined') {
-            SaveManager.save(this);
-        }
-        return true;
-    },
-
-    // スキルセットを装備可能かチェック
-    canEquipSkillSet(skillsArray) {
-        // 1. スロット数チェック
-        const currentRod = this.getCurrentRod();
-        // 基本スロット = (竿の星の数) + 1
-        // ※ rodStarsはgetterで現在のrodRankIndexの星の数を返す
-        let maxSlots = this.rodStars + 1;
-
-        // セット内のスキルによる拡張分を加算
-        // 「セットに含まれている」拡張スキルが有効になる前提で計算する
-        for (const skillId of skillsArray) {
-            const skill = GAME_DATA.SKILLS.find(s => s.id === skillId);
-            if (skill && skill.effect.type === 'skill_slot_expansion') {
-                maxSlots += skill.effect.value;
-            }
-        }
-
-        if (skillsArray.length > maxSlots) {
-            return {
-                can: false,
-                reason: `スロット数が足りません (必要: ${skillsArray.length}, 上限: ${maxSlots})`
-            };
-        }
-
-        // 2. 所持数チェック
-        // 必要なスキルの数を集計
-        const needed = {};
-        for (const id of skillsArray) {
-            needed[id] = (needed[id] || 0) + 1;
-        }
-
-        // インベントリチェック
-        const missingSkills = [];
-        for (const [id, count] of Object.entries(needed)) {
-            const owned = this.skillInventory[id] || 0;
-            if (owned < count) {
-                const skillName = GAME_DATA.SKILLS.find(s => s.id === id)?.name || id;
-                const missingCount = count - owned;
-                missingSkills.push(`「${skillName}」x${missingCount}`);
-            }
-        }
-
-        if (missingSkills.length > 0) {
-            return {
-                can: false,
-                reason: `以下のスキルが不足しています:\n${missingSkills.join('\n')}`
-            };
-        }
-
-        return { can: true };
-    },
-
-    // スキルセットを適用
-    applySkillSet(index) {
-        if (index < 0 || index >= this.skillSets.length) {
-            return { success: false, message: '指定されたスキルセットが存在しません' };
-        }
-
-        const targetSet = this.skillSets[index];
-        const check = this.canEquipSkillSet(targetSet.skills);
-
-        if (!check.can) {
-            return { success: false, message: check.reason };
-        }
-
-        // 適用
-        this.equippedSkills = [...targetSet.skills];
-        console.log(`✨ スキルセット「${targetSet.name}」を装備しました`);
-
-        // 保存
-        if (typeof SaveManager !== 'undefined') {
-            SaveManager.save(this);
-        }
-
-        return { success: true };
     },
 
     // ========================================
@@ -843,112 +664,6 @@ const GameState = {
         return totalMultiplier;
     },
 
-    // ========================================
-    // ランク・経験値システム
-    // ========================================
-
-    // 次のランクまでの必要経験値を計算
-    getNextRankExp() {
-        // Base * (Growth ^ (Rank - 1))
-        return Math.floor(GAME_DATA.RANK_SYSTEM.baseExp * Math.pow(GAME_DATA.RANK_SYSTEM.expGrowthRate, this.rank - 1));
-    },
-
-    // 経験値獲得倍率を取得 (Get XP Multiplier)
-    getXPMultiplier() {
-        let multiplier = 1.0;
-
-        // XP Boost Skill
-        this.getEffectsByType('xp_boost').forEach(effect => {
-            multiplier += effect.value;
-        });
-
-        // Stoic Skill (Trade-off)
-        this.getEffectsByType('stoic').forEach(effect => {
-            if (effect.exp) multiplier += effect.exp;
-        });
-
-        // Fever Mode Bonus (x2)
-        if (this.fever && this.fever.isActive) {
-            multiplier *= 2.0;
-        }
-
-        return Math.max(0, multiplier);
-    },
-
-    // 経験値を獲得
-    addExp(amount) {
-        if (amount <= 0) return;
-
-        // Apply Multiplier
-        const finalAmount = Math.floor(amount * this.getXPMultiplier());
-
-        this.exp += finalAmount;
-
-        // ランクアップ判定
-        this.checkRankUp();
-
-        // UI更新通知 (現状UIManagerが直接参照するか、イベント投げるか)
-        if (typeof UIManager !== 'undefined' && UIManager.updateRankInfo) {
-            UIManager.updateRankInfo();
-        }
-    },
-
-    // ランクアップチェック (再帰的に複数回アップ対応)
-    checkRankUp() {
-        const required = this.getNextRankExp();
-
-        if (this.exp >= required) {
-            this.exp -= required;
-            this.rank++;
-            console.log(`🆙 ランクアップ！ Lv.${this.rank}`);
-            this.processRankUpReward();
-
-            // まだ経験値が残っているかもしれないので再帰チェック
-            this.checkRankUp();
-        }
-    },
-
-    // ランクアップ報酬処理
-    processRankUpReward() {
-        let rewardMultiplier = 1.0;
-        this.getEffectsByType('rank_reward_boost').forEach(effect => {
-            rewardMultiplier += (effect.value - 1.0);
-        });
-
-        // Actually, simpler implementation: Multiplier starts at 1. Effect adds (value).
-        // If 5x skill, value is 5.
-        // If I use additive: 1 + 5 = 6? No.
-        // If I use max: Math.max(1, ...values).
-        // Let's check other skills. 
-        // cosmic_blessing: value 5.0. 
-        // Let's implement as additive of (value).
-        // So if default is 1x.
-        // Skill 5x means +400%? Or total 500%?
-        // Let's assume total multiplier matches the sum of skill values if present, or 1 if not.
-
-        // Re-evaluating:
-        // If multiple skills, usually we sum the "bonus".
-        // Bonus = (Value - 1).
-        // Total = 1 + Sum(Bonuses).
-        // Skill 5x -> Bonus 4. Total 5.
-        // Skill 5x + 10x -> Bonus 4 + 9 = 13. Total 14x.
-
-
-
-        // Coin Reward: Rank * 100 * Multiplier
-        const coinReward = Math.floor(this.rank * 100 * rewardMultiplier);
-        this.addMoney(coinReward);
-
-        // Ticket Reward: Equal to Rank * Multiplier
-        const ticketReward = Math.floor(this.rank * rewardMultiplier);
-        this.addGachaTickets(ticketReward);
-
-        // 報酬をユーザーに通知するためのキューに入れる
-        if (typeof UIManager !== 'undefined') {
-            UIManager.showRankUp(this.rank, coinReward, ticketReward);
-        }
-    },
-
     // ランクによるパワーボーナスを取得 (倍率)
     getRankPowerBonus() {
         let bonusRate = (this.rank - 1) * GAME_DATA.RANK_SYSTEM.powerBonusPerRank;
@@ -961,12 +676,6 @@ const GameState = {
 
         // 例: Rank 10 (9% base) * Skill 1.5 (+50%) = 13.5% (0.135)
         return bonusRate * multiplier;
-    },
-
-    // ランクによるミッション報酬倍率 (1.0 + (Rank-1)*0.1 etc)
-    getRankRewardMultiplier() {
-        // 例: ランク1につき+5%
-        return 1.0 + ((this.rank - 1) * 0.05);
     },
 
     // ========================================
@@ -1142,122 +851,6 @@ const GameState = {
     },
 
     // ========================================
-    // 港スキル補正 (Port Skill Modifiers)
-    // ========================================
-
-    // 漁獲間隔短縮率 (0.0 ~ 1.0)
-    // 漁獲間隔短縮 multiplier (1.0 - reduction)
-    getShipIntervalMultiplier() {
-        let reduction = 0;
-        this.getEffectsByType('ship_interval_down').forEach(effect => {
-            reduction += effect.value;
-        });
-        return Math.max(1.0 - reduction, 0.1); // 最低10%は残す
-    },
-
-    // 漁獲量ボーナス (min, max加算値)
-    // 漁獲量ボーナス (min, max加算値)
-    getShipAmountBonus() {
-        let bonus = { min: 0, max: 0 };
-        this.getEffectsByType('ship_amount_up').forEach(effect => {
-            bonus.min += effect.min;
-            bonus.max += effect.max;
-        });
-        return bonus;
-    },
-
-    // 燃料消費回避確率
-    // 燃料消費効率 (回避確率)
-    getShipFuelEfficiency() {
-        let chance = 0;
-        this.getEffectsByType('ship_fuel_eco').forEach(effect => {
-            chance += effect.value;
-        });
-        return Math.min(chance, 1.0);
-    },
-
-    // 燃料購入割引率
-    getPortFuelDiscount() {
-        let discount = 0;
-        this.getEffectsByType('ship_fuel_discount').forEach(effect => {
-            discount += effect.value;
-        });
-        return Math.min(discount, 0.9); // 最大90%OFF
-    },
-
-    // ========================================
-    // 港管理メソッド
-    // ========================================
-
-    // 船を購入
-    buyShip(shipId) {
-        const ship = GAME_DATA.SHIPS.find(s => s.id === shipId);
-        if (!ship) {
-            console.error(`Ship not found: ${shipId}`);
-            return false;
-        }
-
-        if (this.money < ship.price) {
-            console.log('Not enough money to buy ship');
-            return false;
-        }
-
-        this.addMoney(-ship.price);
-        this.port.ownedShipId = shipId;
-        console.log(`Ship purchased: ${ship.name}`);
-        return true;
-    },
-
-    // 燃料を追加
-    addFuel(fuelId) {
-        const fuel = GAME_DATA.FUELS.find(f => f.id === fuelId);
-        if (!fuel) {
-            console.error(`Fuel not found: ${fuelId}`);
-            return false;
-        }
-
-        // 割引適用
-        const discount = this.getPortFuelDiscount();
-        const finalPrice = Math.floor(fuel.price * (1.0 - discount));
-
-        if (this.money < finalPrice) {
-            console.log('Not enough money to buy fuel');
-            return false;
-        }
-
-        this.addMoney(-finalPrice);
-        this.port.fuelMinutes += fuel.recovery;
-        console.log(`Fuel added: +${fuel.recovery} mins. Total: ${this.port.fuelMinutes} mins`);
-        return true;
-    },
-
-    // 港の在庫を換金
-    collectPortStock() {
-        if (!this.port.stock || this.port.stock.length === 0) {
-            return 0;
-        }
-
-        let totalValue = 0;
-        const priceBonus = this.getPriceBonus(); // 例: 0.1 (+10%), -0.2 (-20%) etc
-        const priceMultiplier = 1.0 + priceBonus;
-
-        this.port.stock.forEach(fish => {
-            // 基本売価 * (1 + 補正)
-            let sellPrice = Math.floor(fish.price * priceMultiplier);
-            if (sellPrice < 1) sellPrice = 1;
-            totalValue += sellPrice;
-        });
-
-        this.addMoney(totalValue);
-        console.log(`Port stock collected: ${this.port.stock.length} fish for ${totalValue} G`);
-
-        // 在庫クリア
-        this.port.stock = [];
-
-        return totalValue;
-    },
-
-    // ========================================
     // ダブルキャッチ (2匹釣り) 確率を取得
     // ========================================
     getMultiCatch2Chance() {
@@ -1309,51 +902,6 @@ const GameState = {
     },
 
     // ========================================
-    // ミッション目標数の修正値を取得
-    // ========================================
-    getMissionTargetModifier() {
-        let modifier = 1.0;
-
-        this.getEffectsByType('stoic').forEach(effect => {
-            modifier *= effect.targetMult;
-        });
-        this.getEffectsByType('casual').forEach(effect => {
-            modifier *= effect.targetMult;
-        });
-
-        return modifier;
-    },
-
-    // ========================================
-    // ミッション報酬の修正値を取得
-    // ========================================
-    getMissionRewardModifier() {
-        let modifier = 1.0;
-
-        this.getEffectsByType('mission_reward').forEach(effect => {
-            modifier *= effect.value;
-        });
-        this.getEffectsByType('mission_reward_up').forEach(effect => {
-            modifier += effect.value;
-        });
-        this.getEffectsByType('stoic').forEach(effect => {
-            modifier *= effect.rewardMult;
-        });
-        this.getEffectsByType('casual').forEach(effect => {
-            modifier *= effect.rewardMult;
-        });
-
-        // 現在のパワーを反映 (パワー100につき+10%のボーナスと仮定)
-        // インフレしすぎないように調整
-        const totalPower = this.getTotalPower();
-        const powerBonus = totalPower / 1000.0; // パワー1000で+1.0倍(2倍)
-
-        modifier += powerBonus;
-
-        return Math.max(modifier, 0.1);
-    },
-
-    // ========================================
     // スキル増幅率を取得（増幅の心得）
     // ========================================
     getSkillAmplifier() {
@@ -1362,200 +910,6 @@ const GameState = {
             amplifier += effect.value;
         });
         return amplifier;
-    },
-
-    // ========================================
-    // 魚をインベントリに追加
-    // ========================================
-    addFish(fish) {
-        const fishData = {
-            id: fish.id,
-            name: fish.name,
-            price: fish.price,
-            power: fish.power,
-            rarity: fish.rarity,
-            hasTitle: fish.hasTitle || false,
-            caughtAt: new Date().toISOString()
-        };
-
-        this.inventory.push(fishData);
-
-        // 図鑑データを更新
-        if (!this.encyclopedia[fish.id]) {
-            this.encyclopedia[fish.id] = { count: 0, hasSpecial: false, specialCount: 0 };
-        }
-        this.encyclopedia[fish.id].count++;
-
-        if (fish.hasTitle) {
-            this.encyclopedia[fish.id].hasSpecial = true;
-            this.encyclopedia[fish.id].specialCount = (this.encyclopedia[fish.id].specialCount || 0) + 1;
-        }
-
-        this.totalFishCaught++;
-
-        // ランク統計の更新
-        if (this.caughtByRank[fish.rarity] !== undefined) {
-            this.caughtByRank[fish.rarity]++;
-        }
-
-        // 最大の魚を更新
-        if (!this.biggestFish || fish.power > this.biggestFish.power) {
-            this.biggestFish = { name: fish.name, power: fish.power };
-        }
-
-        // オートセーブ
-        SaveManager.save(this);
-    },
-
-    // ========================================
-    // ガチャ結果の受け取り（コスト消費なしでスキル追加）
-    // ========================================
-    // ========================================
-    // ガチャ結果の受け取り
-    // ========================================
-    gainGachaResult(item) {
-        // IDのみ渡された場合の互換性維持 (文字列かどうか判定)
-        const id = (typeof item === 'string') ? item : item.id;
-        const category = item.category || 'skill';
-
-        if (category === 'skill') {
-            this.skillInventory[id] = (this.skillInventory[id] || 0) + 1;
-            this.totalSkills++;
-        } else if (category === 'skin') {
-            if (!this.unlockedSkins.includes(id)) {
-                this.unlockedSkins.push(id);
-            }
-        } else if (category === 'sky') {
-            if (!this.unlockedSkies.includes(id)) {
-                this.unlockedSkies.push(id);
-            }
-        }
-
-        // オートセーブ
-        SaveManager.save(this);
-    },
-
-    // ========================================
-    // 所持魚をすべて売却
-    // ========================================
-    // ========================================
-    // ガチャリソース管理
-    // ========================================
-    canDrawGacha(cost, count) {
-        // チケットで足りるかチェック
-        if (this.gachaTickets >= count) return { can: true, method: 'ticket' };
-        // コインで足りるかチェック
-        if (this.money >= cost) return { can: true, method: 'money' };
-        return { can: false };
-    },
-
-    consumeGachaResources(cost, count) {
-        if (this.gachaTickets >= count) {
-            this.gachaTickets -= count;
-            return 'ticket';
-        } else {
-            this.money -= cost;
-            return 'money';
-        }
-    },
-
-    sellAllFish() {
-        const priceBonus = this.getPriceBonus();
-        const count = this.inventory.length;
-        let totalEarned = 0;
-
-        for (const fish of this.inventory) {
-            const finalPrice = Math.floor(fish.price * (1 + priceBonus));
-            totalEarned += finalPrice;
-        }
-
-        this.money += totalEarned;
-        this.totalMoneyEarned += totalEarned;
-        this.totalCoinsEarned += totalEarned;
-        this.totalCoinsEarned += totalEarned;
-        this.inventory = [];
-
-        // ミッション判定: 魚を売る
-        if (typeof MissionManager !== 'undefined') {
-            MissionManager.checkMission('sell_fish');
-            // お金を稼ぐミッション用
-            MissionManager.checkMission('money_earned', { amount: totalEarned });
-        }
-
-        // オートセーブ
-        SaveManager.save(this);
-
-        // 売却時チケットドロップ判定 (sell_ticket_chance)
-        // 1回売却ごとの判定か、魚1匹ごとの判定か？
-        // 文言「売却時に確率で」なら売却アクション1回につき、と読めるが、
-        // 「大量に売るとお得」感を出すなら魚の数に依存させたい。
-        // ここでは「魚1匹につきそれぞれ抽選」だと処理が重い＆大量獲得すぎる可能性。
-        // -> 「一度の売却アクションで、(魚の数/10)回抽選」のようにスケールさせる、
-        // または「売却総額に応じて抽選」などが良い。
-        // シンプルに: 売却した魚の数だけループして判定（確率は低めに設定されている前提）
-
-        let earnedTickets = 0;
-        let ticketChance = 0;
-
-        // スキルから確率取得 (Tier1: 1%, Tier2: ? ...)
-        for (const skillId of this.equippedSkills) {
-            const skill = GAME_DATA.SKILLS.find(s => s.id === skillId);
-            if (skill && skill.effect.type === 'sell_ticket_chance') {
-                ticketChance += skill.effect.value;
-            }
-        }
-
-        if (ticketChance > 0) {
-            // まとめて計算 (二項分布的近似、または個別に回す)
-            // 個別に回す方が確実
-            let attemptCount = count; // 売った数だけ抽選
-
-            // パフォーマンス考慮: 数が多い場合は近似計算も検討だが、100匹程度ならループでOK
-            for (let i = 0; i < attemptCount; i++) {
-                if (Math.random() < ticketChance) {
-                    earnedTickets++;
-                }
-            }
-
-            if (earnedTickets > 0) {
-                this.gachaTickets += earnedTickets;
-                UIManager.showMessage(`🎫 売却ボーナス: チケット${earnedTickets}枚を獲得！`, 3000);
-            }
-        }
-
-        return totalEarned;
-    },
-
-    // ========================================
-    // 釣り竿の購入
-    // ========================================
-    buyRod(rodIndex) {
-        const rod = GAME_DATA.RODS[rodIndex];
-        if (!rod) return false;
-
-        // 割引適用
-        const discount = this.getShopDiscount();
-        const finalPrice = Math.floor(rod.price * (1.0 - discount));
-
-        if (this.money < finalPrice) {
-            return false;
-        }
-
-        // 既にアンロック済みならスキップ
-        if (this.unlockedRods.includes(rodIndex)) {
-            return false;
-        }
-
-        this.money -= finalPrice;
-        this.unlockedRods.push(rodIndex);
-
-        // スキンをアンロック
-        this.unlockSkinByRodId(rod.id);
-
-        // オートセーブ
-        SaveManager.save(this);
-
-        return true;
     },
 
     // ========================================
@@ -1600,14 +954,7 @@ const GameState = {
 
         this.equippedSkills.push(skillId);
 
-        // ミッション判定: スキルを装備
-        if (typeof MissionManager !== 'undefined') {
-            MissionManager.checkMission('equip_skill');
-        }
 
-        // オートセーブ
-        SaveManager.save(this);
-        console.log(`⚔️ スキル装備: ${skillId}`);
         return { can: true };
     },
 
@@ -1617,112 +964,8 @@ const GameState = {
         if (index === -1) return { can: false, reason: '装備していません' };
 
         this.equippedSkills.splice(index, 1);
-        // オートセーブ
-        SaveManager.save(this);
-        console.log(`🛡️ スキル解除: ${skillId}`);
+        this.trimEquippedSkills();
         return { can: true };
-    },
-
-    // ========================================
-    // 空（背景）の購入
-    // ========================================
-    buySky(skyId) {
-        const sky = GAME_DATA.SKIES.find(s => s.id === skyId);
-        if (!sky) return false;
-
-        // 割引適用
-        const discount = this.getShopDiscount();
-        const finalPrice = Math.floor(sky.price * (1.0 - discount));
-
-        if (this.money < finalPrice) {
-            return false;
-        }
-
-        // 既にアンロック済みならスキップ
-        if (this.unlockedSkies.includes(skyId)) {
-            return false;
-        }
-
-        this.money -= finalPrice;
-        this.unlockedSkies.push(skyId);
-
-        // オートセーブ
-        SaveManager.save(this);
-
-        return true;
-    },
-
-    // ========================================
-    // 空（背景）の装備
-    // ========================================
-    equipSky(skyId) {
-        if (!this.unlockedSkies.includes(skyId)) {
-            return false;
-        }
-
-        this.selectedSky = skyId;
-        SaveManager.save(this);
-        return true;
-    },
-
-    // ========================================
-    // 釣り竿の装備切り替え
-    // ========================================
-    equipRod(rodIndex) {
-        if (!this.unlockedRods.includes(rodIndex)) {
-            return false;
-        }
-
-        this.rodRankIndex = rodIndex;
-
-        // 星の数をリセット（竿ごとに星は別管理としない場合）
-        // 仕様によってはここを調整
-
-        // 装着スキルをスロット数に合わせて調整
-        while (this.equippedSkills.length > this.rodStars) {
-            this.equippedSkills.pop();
-        }
-
-        SaveManager.save(this);
-        return true;
-    },
-
-    // ========================================
-    // 釣り竿の強化（星を増やす）
-    // ========================================
-    upgradeRod() {
-        if (this.rodStars >= 5) {
-            return { success: false, message: '既に最大まで強化されています' };
-        }
-
-        const rod = this.getCurrentRod();
-        const cost = rod.upgradeCosts[this.rodStars];
-
-        if (this.money < cost) {
-            return { success: false, message: 'お金が足りません' };
-        }
-
-        this.money -= cost;
-        this.rodStars++;
-
-        // オートセーブ
-        SaveManager.save(this);
-
-        return { success: true, newStars: this.rodStars };
-    },
-
-    // ========================================
-    // 次の強化コストを取得
-    // ========================================
-    getUpgradeCost() {
-        if (this.rodStars >= 5) return null;
-        const rod = this.getCurrentRod();
-        let baseCost = rod.upgradeCosts[this.rodStars];
-
-        // スキルによる割引 (upgrade_discount)
-        const modifier = this.getUpgradeCostModifier(); // 1.0 (等倍) 〜 0.X (割引)
-
-        return Math.floor(baseCost * modifier);
     },
 
     // ========================================
@@ -1770,206 +1013,10 @@ const GameState = {
     },
 
     // ========================================
-    // スキル合成 (Synthesize)
-    // ========================================
-    synthesizeSkills(id1, id2) {
-        const skill1 = this.getSkillData(id1);
-        const skill2 = this.getSkillData(id2);
-
-        if (!skill1 || !skill2) return { success: false, message: 'スキルが見つかりません' };
-
-        // 所持チェック
-        const owned1 = this.getSkillCount(id1);
-        const owned2 = this.getSkillCount(id2);
-        if (id1 === id2) {
-            if (owned1 < 2) return { success: false, message: '合成には同じスキルが2つ必要です' };
-        } else {
-            if (owned1 < 1 || owned2 < 1) return { success: false, message: '素材が足りません' };
-        }
-
-        // Tier 4は素材不可
-        if (skill1.tier >= 4 || skill2.tier >= 4) {
-            return { success: false, message: 'Tier 4スキルは素材にできません' };
-        }
-
-        // ハイブリッドスキルは素材にできない
-        if (skill1.effect.type === 'hybrid' || skill2.effect.type === 'hybrid') {
-            return { success: false, message: '合成済みスキルは素材にできません' };
-        }
-
-        let resultId, resultSkill, cost;
-        const base1 = id1.replace(/_\d$/, '');
-        const base2 = id2.replace(/_\d$/, '');
-        const tier = skill1.tier;
-
-        // 優先順位: 1. 特殊合成 (レシピ一致) -> 2. ランクアップ (同名) -> 3. ハイブリッド (異名)
-        const key1 = base1 + '+' + base2;
-        const key2 = base2 + '+' + base1;
-        const specialResultBase = (skill1.tier === skill2.tier && GAME_DATA.SPECIAL_RECIPES)
-            ? (GAME_DATA.SPECIAL_RECIPES[key1] || GAME_DATA.SPECIAL_RECIPES[key2])
-            : null;
-
-        if (specialResultBase) {
-            // 特殊合成 (Tier無し)
-            resultId = specialResultBase;
-            resultSkill = GAME_DATA.SKILLS.find(s => s.id === resultId);
-
-            if (!resultSkill) {
-                return { success: false, message: '特殊スキルのデータが見つかりません' };
-            }
-
-            const specialCosts = { 1: 3000, 2: 15000, 3: 60000 };
-            cost = specialCosts[tier] || 100000;
-        } else if (id1 === id2) {
-            // 同名ランクアップ合成
-            const nextTier = skill1.tier + 1;
-            resultId = `${base1}_${nextTier}`;
-            resultSkill = GAME_DATA.SKILLS.find(s => s.id === resultId);
-
-            if (!resultSkill) {
-                return { success: false, message: '次のランクのスキルが定義されていません' };
-            }
-
-            // ランクアップ費用
-            const costs = { 1: 1000, 2: 5000, 3: 20000 };
-            cost = costs[skill1.tier] || 50000;
-
-            // 特殊スキルのランクアップは費用増
-            if (GAME_DATA.SPECIAL_RECIPES && Object.values(GAME_DATA.SPECIAL_RECIPES).includes(base1)) {
-                cost *= 2;
-            }
-        } else {
-            // 通常ハイブリッド合成
-            if (skill1.tier !== skill2.tier) {
-                return { success: false, message: 'Tierが一致していません' };
-            }
-
-            resultId = `hybrid_${id1}_${id2}`;
-            if (id1 > id2) resultId = `hybrid_${id2}_${id1}`;
-
-            resultSkill = {
-                id: resultId,
-                name: `${skill1.name.split(' ')[0]}と${skill2.name.split(' ')[0]}の融合`,
-                description: `${skill1.name}と${skill2.name}の効果を併せ持つ`,
-                tier: tier,
-                effect: {
-                    type: 'hybrid',
-                    effects: [skill1.effect, skill2.effect]
-                },
-                isHybrid: true
-            };
-
-            const hybridCosts = { 1: 1500, 2: 7500, 3: 30000 };
-            cost = hybridCosts[tier] || 75000;
-        }
-
-        if (this.money < cost) {
-            return { success: false, message: `お金が足りません (必要: ${cost} G)` };
-        }
-
-        // 消費
-        this.addMoney(-cost);
-        this.skillInventory[id1]--;
-        this.skillInventory[id2]--;
-
-        // 獲得
-        if (resultSkill.isHybrid) {
-            this.customSkills[resultId] = resultSkill;
-        }
-        this.skillInventory[resultId] = (this.skillInventory[resultId] || 0) + 1;
-        this.totalSkills++;
-
-        SaveManager.save(this);
-        return { success: true, skill: resultSkill, cost: cost };
-    }
-    ,
-
-    // ========================================
-    // スキルの購入
-    // ========================================
-    buySkill(skillId) {
-        const skill = GAME_DATA.SKILLS.find(s => s.id === skillId);
-        if (!skill) return false;
-
-        // 割引適用
-        const discount = this.getShopDiscount();
-        const finalPrice = Math.floor(skill.price * (1.0 - discount));
-
-        if (this.money < finalPrice) {
-            return false;
-        }
-
-        this.money -= finalPrice;
-
-        // 所持数を加算
-        this.skillInventory[skillId] = (this.skillInventory[skillId] || 0) + 1;
-        this.totalSkills++;
-
-        // オートセーブ
-        SaveManager.save(this);
-
-        return true;
-    },
-
-    // ========================================
-    // スキルの追加
-    // ========================================
-    addSkill(skillId) {
-        this.skillInventory[skillId] = (this.skillInventory[skillId] || 0) + 1;
-        SaveManager.save(this);
-    },
-
-    // ========================================
     // スキル所持判定
     // ========================================
     hasSkill(skillId) {
         return (this.skillInventory[skillId] || 0) > 0;
-    },
-
-
-
-    // ========================================
-    // 餌の購入
-    // ========================================
-    buyBait(baitId, quantity = null) {
-        const bait = GAME_DATA.BAITS.find(b => b.id === baitId);
-        if (!bait) return false;
-
-        // 指定数量、またはデフォルト数量
-        const amount = quantity || bait.quantity;
-        // 価格計算（数量指定の場合は比例計算、デフォルトの場合は設定価格）
-        // 注: 現在のGAME_DATAでは単価が定義されていないため、セット価格から算出する必要があるかもですが
-        // 一旦、購入時は基本セット単位とします。
-        // 要望により「個数を選べる」とあるので、単価計算ロジックが必要。
-        // ここでは単純に bait.price は bait.quantity 個分の価格と仮定して、単価を算出します。
-        const unitPrice = bait.quantity > 0 ? bait.price / bait.quantity : 0;
-        const baseTotalCost = Math.ceil(unitPrice * amount);
-
-        // 割引適用
-        const discount = this.getShopDiscount();
-        const finalCost = Math.floor(baseTotalCost * (1.0 - discount));
-
-        if (this.money < finalCost) {
-            return false;
-        }
-
-        this.money -= finalCost;
-
-        // 餌を追加
-        if (this.baitInventory[baitId] === -1) {
-            // 無限の場合は増えない
-        } else {
-            this.baitInventory[baitId] = (this.baitInventory[baitId] || 0) + amount;
-        }
-
-        // 現在選択中の餌がこれなら切り替え不要、でなければ...自動で切り替えるかはUI次第だが
-        // 購入した餌をすぐに使いたいケースが多いので切り替えても良い
-        this.baitType = baitId;
-
-        // オートセーブ
-        SaveManager.save(this);
-
-        return true;
     },
 
     // ========================================
@@ -1983,23 +1030,6 @@ const GameState = {
             });
         }
         return mult;
-    },
-
-    // ========================================
-    // 餌の追加（宝箱などから）
-    // ========================================
-    addBait(baitId, amount) {
-        if (!amount || amount <= 0) return;
-
-        // 餌を追加
-        if (this.baitInventory[baitId] === -1) {
-            // 無限の場合は増えない
-        } else {
-            this.baitInventory[baitId] = (this.baitInventory[baitId] || 0) + amount;
-        }
-
-        // オートセーブ
-        SaveManager.save(this);
     },
 
     // ========================================
@@ -2031,102 +1061,12 @@ const GameState = {
         return bonus;
     },
 
-    // ========================================
-    // 現在の餌の所持数を取得
-    // ========================================
-    getCurrentBaitCount() {
-        if (!this.baitType) return 0;
-        return this.baitInventory[this.baitType] ?? 0;
-    },
-
-    // ========================================
-    // 餌の切り替え
-    // ========================================
-    switchBait(direction) {
-        const baits = GAME_DATA.BAITS;
-        const currentIndex = baits.findIndex(b => b.id === this.baitType);
-        if (currentIndex === -1) {
-            this.baitType = baits[0].id;
-            return;
-        }
-
-        let nextIndex = currentIndex + direction;
-        if (nextIndex >= baits.length) {
-            nextIndex = 0;
-        } else if (nextIndex < 0) {
-            nextIndex = baits.length - 1;
-        }
-
-        this.baitType = baits[nextIndex].id;
-        SaveManager.save(this);
-    },
-
-    // ========================================
-    // 餌を1つ消費
-    // ========================================
-    useBait(isSuccess = true) {
-        if (!this.baitType) return false;
-
-        const bait = GAME_DATA.BAITS.find(b => b.id === this.baitType);
-        if (!bait) return false;
-
-        const currentCount = this.baitInventory[this.baitType];
-        if (currentCount === -1) return true;
-
-        if ((bait.rank === 'C' || bait.rank === 'B') && !isSuccess) {
-            return true;
-        }
-
-        if (currentCount <= 0) return false;
-
-        if (isSuccess) {
-            const saveChance = this.getBaitSaveChance();
-            if (Math.random() < saveChance) {
-                console.log('✨ 餌の達人発動！');
-                return true;
-            }
-        }
-
-        this.baitInventory[this.baitType]--;
-        SaveManager.save(this);
-        return true;
-    },
-
-    // ========================================
-    // スキン関連
-    // ========================================
-    getCurrentSkin() {
-        return GAME_DATA.SKINS.find(s => s.id === this.selectedSkin) || GAME_DATA.SKINS[0];
-    },
-
-    equipSkin(skinId) {
-        if (!this.unlockedSkins.includes(skinId)) return false;
-        this.selectedSkin = skinId;
-        SaveManager.save(this);
-        return true;
-    },
-
-    unlockSkinByRodId(rodId) {
-        const skin = GAME_DATA.SKINS.find(s => s.rodId === rodId);
-        if (skin && !this.unlockedSkins.includes(skin.id)) {
-            this.unlockedSkins.push(skin.id);
-            return true;
-        }
-        return false;
-    },
 
     // ========================================
     // 達人の針（赤ゾーン確定）所持判定
     // ========================================
     hasPerfectMaster() {
         return this.getEffectsByType('master_needle').length > 0;
-    },
-
-    // ========================================
-    // 永久機関（燃料消費なし）所持判定
-    // ========================================
-    hasPerpetualEngine() {
-        return this.getEffectsByType('perpetual_engine').length > 0;
     },
 
     // ========================================

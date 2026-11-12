@@ -3,111 +3,9 @@
 
 const UIManager = {
     // ========================================
-    // ガチャ（スロットマシン）演出
-    // ========================================
-    showSlotAnimation(results, onComplete) {
-        const overlay = document.createElement('div');
-        overlay.id = 'gacha-slot-overlay';
-        overlay.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 2000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        `;
-
-        // スロットマシーンの見た目
-        const slotContainer = document.createElement('div');
-        slotContainer.style.cssText = `
-            border: 10px solid #ffd700;
-            border-radius: 20px;
-            padding: 20px;
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
-            display: flex; gap: 10px;
-        `;
-
-        // リールの作成 (3つ)
-        for (let i = 0; i < 3; i++) {
-            const reel = document.createElement('div');
-            reel.className = 'slot-reel';
-            reel.style.cssText = `
-                width: 80px; height: 120px;
-                background: #fff;
-                border: 4px solid #333;
-                border-radius: 10px;
-                overflow: hidden;
-                position: relative;
-            `;
-
-            // 回転するストリップ
-            const strip = document.createElement('div');
-            strip.className = 'reel-strip';
-            strip.style.cssText = `
-                position: absolute; top: 0; left: 0; width: 100%;
-                display: flex; flex-direction: column; align-items: center;
-            `;
-            // ダミーアイコン
-            const icons = ['auto_awesome', 'stars', 'bolt', 'palette', 'diamond', 'phishing'];
-            let stripHtml = '';
-            for (let j = 0; j < 20; j++) {
-                const icon = icons[Math.floor(Math.random() * icons.length)];
-                stripHtml += `<span class="material-icons" style="font-size: 48px; line-height: 120px; color: #333;">${icon}</span>`;
-            }
-            strip.innerHTML = stripHtml;
-
-            reel.appendChild(strip);
-            slotContainer.appendChild(reel);
-
-            // アニメーション (CSS keyframes needed or simple js)
-            // Simple JS implementation
-            this.animateReel(strip, i * 200 + 1500, results);
-        }
-
-        const title = document.createElement('div');
-        title.innerHTML = '<h2 style="color: #ffd700; font-size: 2rem; margin-bottom: 20px; text-shadow: 0 0 10px #ffd700;">JACKPOT SLOTS</h2>';
-
-        overlay.appendChild(title);
-        overlay.appendChild(slotContainer);
-        document.body.appendChild(overlay);
-
-        // 演出全体の時間（全てのリールが止まった後）
-        setTimeout(() => {
-            overlay.style.transition = 'opacity 0.5s';
-            overlay.style.opacity = '0';
-            setTimeout(() => {
-                overlay.remove();
-                if (onComplete) onComplete();
-            }, 500);
-        }, 3000); // 3秒後
-    },
-
-    animateReel(element, duration, results) {
-        // キーフレームアニメーションを動的に追加
-        const keyframes = [
-            { transform: 'translateY(0)' },
-            { transform: 'translateY(-1000px)' }
-        ];
-
-        const animation = element.animate(keyframes, {
-            duration: 200,
-            iterations: Infinity
-        });
-
-        setTimeout(() => {
-            animation.cancel();
-            // 最後の位置（結果に基づく）を決めるロジックは入れていない（簡易演出）
-            // 止まった位置に固定
-            element.style.transform = 'translateY(-50px)'; // センター合わせ
-
-            // 輝きエフェクト
-            element.parentElement.style.boxShadow = '0 0 20px white';
-            element.parentElement.style.borderColor = '#fff';
-        }, duration);
-    },
-    // ========================================
     // 現在の画面
     // ========================================
-    currentScreen: 'start',  // start, fishing, shop
-    lastMoney: null,
+    currentScreen: 'start',  // start, fishing, harbor, encyclopedia
 
     // ========================================
     // ゲージバトル設定
@@ -119,12 +17,10 @@ const UIManager = {
     // 画面切り替え
     // ========================================
     showScreen(screenId) {
-        // すべての画面を非表示
         document.querySelectorAll('.screen').forEach(screen => {
             screen.classList.remove('active');
         });
 
-        // 指定した画面を表示
         const screen = document.getElementById(`${screenId}-screen`);
         if (screen) {
             screen.classList.add('active');
@@ -132,177 +28,100 @@ const UIManager = {
         }
 
         // 画面固有の初期化
-        if (screenId === 'fishing') {
+        if (screenId === 'start') {
+            this.initStartScreen();
+        } else if (screenId === 'fishing') {
             this.showIdle();
             this.updateStatus();
             this.updateSkyVisuals();
-        } else if (screenId === 'shop') {
-            ShopManager.renderShop();
+        } else if (screenId === 'harbor') {
+            HarborUI.render();
         } else if (screenId === 'encyclopedia') {
             EncyclopediaManager.render();
-        } else if (screenId === 'stats') {
-            this.renderStats();
-        } else if (screenId === 'skills') {
-            SkillInventoryManager.render();
-        } else if (screenId === 'skills') {
-            SkillInventoryManager.render();
-        } else if (screenId === 'gacha') {
-            this.prepareGachaScreen();
-        } else if (screenId === 'port') {
-            ShopManager.renderPort();
-        } else if (screenId === 'debug') {
-            DebugManager.render();
         }
     },
 
     // ========================================
-    // スタート画面
+    // スタート画面（つづきからボタンと最高記録）
     // ========================================
     initStartScreen() {
-        const hasSave = SaveManager.hasSaveData();
         const continueBtn = document.getElementById('continue-btn');
-
         if (continueBtn) {
-            if (hasSave) {
-                continueBtn.classList.remove('hidden');
-            } else {
-                continueBtn.classList.add('hidden');
-            }
+            continueBtn.classList.toggle('hidden', !SaveManager.hasSaveData());
         }
 
-        /* // デバッグツールバー作成
-        // 既存ボタン/ツールバーがあれば削除
-        const existingBtn = document.getElementById('debug-money-btn');
-        if (existingBtn) existingBtn.remove();
-        const existingToolbar = document.getElementById('debug-toolbar');
-        if (existingToolbar) existingToolbar.remove();
-
-        const toolbar = document.createElement('div');
-        toolbar.id = 'debug-toolbar';
-        toolbar.style.position = 'fixed';
-        toolbar.style.top = '10px';
-        toolbar.style.left = '10px';
-        toolbar.style.zIndex = '2147483647';
-        toolbar.style.display = 'flex';
-        toolbar.style.flexDirection = 'column';
-        toolbar.style.gap = '8px';
-        toolbar.style.pointerEvents = 'none'; // コンテナ自体はクリック透過
-
-        const createDebugBtn = (text, onClick, color = 'rgba(255, 0, 0, 0.8)') => {
-            const btn = document.createElement('button');
-            btn.textContent = text;
-            btn.style.fontSize = '12px';
-            btn.style.padding = '6px 10px';
-            btn.style.backgroundColor = color;
-            btn.style.color = 'white';
-            btn.style.border = '1px solid white';
-            btn.style.borderRadius = '4px';
-            btn.style.cursor = 'pointer';
-            btn.style.pointerEvents = 'auto'; // ボタンはクリック有効
-            btn.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClick();
-                // 共通更新処理
-                SaveManager.saveGame();
-                if (typeof this.updateMoney === 'function') this.updateMoney();
-                if (typeof this.updateFeverVisuals === 'function') this.updateFeverVisuals();
-            });
-            return btn;
-        };
-
-        // 1. お金追加ボタン
-        toolbar.appendChild(createDebugBtn('💰 +100万', () => {
-            GameState.addMoney(1000000);
-            this.showMessage('所持金 +1,000,000 G');
-        }));
-
-        // 2. フィーバー +1
-        toolbar.appendChild(createDebugBtn('🔥 Fever +1', () => {
-            if (!GameState.fever) GameState.fever = { value: 0, isActive: false, type: 'sun' };
-            GameState.fever.value = (GameState.fever.value + 1);
-            if (GameState.fever.value > 12) GameState.fever.value = 0; // ループ
-            if (!GameState.fever.type) GameState.fever.type = 'sun';
-            this.showMessage(`Fever Lv: ${GameState.fever.value} (${GameState.fever.type})`);
-        }, 'rgba(255, 100, 0, 0.8)'));
-
-        // 3. フィーバー -1
-        toolbar.appendChild(createDebugBtn('❄️ Fever -1', () => {
-            if (!GameState.fever) GameState.fever = { value: 0, isActive: false, type: 'sun' };
-            GameState.fever.value = Math.max(0, GameState.fever.value - 1);
-            if (!GameState.fever.type) GameState.fever.type = 'sun';
-            this.showMessage(`Fever Lv: ${GameState.fever.value} (${GameState.fever.type})`);
-        }, 'rgba(0, 100, 255, 0.8)'));
-
-        // 4. タイプ切り替え
-        toolbar.appendChild(createDebugBtn('🌞/🌚 Type', () => {
-            if (!GameState.fever) GameState.fever = { value: 0, isActive: false, type: 'sun' };
-            GameState.fever.type = GameState.fever.type === 'sun' ? 'moon' : 'sun';
-            this.showMessage(`Type: ${GameState.fever.type}`);
-        }, 'rgba(100, 0, 200, 0.8)'));
-
-        document.body.appendChild(toolbar); */
-
-        // スワイプ操作の初期化
-        this.initSwipeListeners();
+        const record = document.getElementById('start-record');
+        if (record) {
+            const meta = SaveManager.loadMeta();
+            record.textContent = meta.totalRuns > 0
+                ? `最高記録: ラウンド${meta.bestRound} クリア${meta.clears > 0 ? ` ／ 航海達成 ${meta.clears}回` : ''}`
+                : '';
+        }
     },
 
     // ========================================
-    // スワイプ操作の初期化
+    // 釣り画面のステータス表示をまとめて更新
     // ========================================
-    initSwipeListeners() {
-        let touchStartX = 0;
-        let touchStartY = 0;
-        const minSwipeDistance = 50; // スワイプと判定する最小距離
+    updateStatus() {
+        this.updateMoney();
+        this.updateRunPanel();
+        this.updateRodInfo();
+        this.updateBaitInfo();
+    },
 
-        const handleTouchStart = (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-            touchStartY = e.changedTouches[0].screenY;
-        };
+    // 所持金とパワー
+    updateMoney() {
+        const money = `${GameState.money.toLocaleString()} G`;
+        ['money-display', 'shop-money-display'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = money;
+        });
 
-        const handleTouchEnd = (e) => {
-            const touchEndX = e.changedTouches[0].screenX;
-            const touchEndY = e.changedTouches[0].screenY;
-
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
-
-            // 横方向のスワイプか判定 (縦方向の移動が大きすぎる場合は無視)
-            if (Math.abs(deltaX) > minSwipeDistance && Math.abs(deltaY) < 100) {
-                if (deltaX < 0) {
-                    // 左スワイプ (右へ進む)
-                    if (this.currentScreen === 'fishing') {
-                        // 釣り -> ショップ
-                        // 釣り実行中は遷移させない（ステートでチェック）
-                        if (FishingGame.state === 'idle') {
-                            FishingGame.abort();
-                            this.showScreen('shop');
-                        }
-                    }
-                } else {
-                    // 右スワイプ (左へ戻る)
-                    if (this.currentScreen === 'shop') {
-                        // ショップ -> 釣り
-                        this.showScreen('fishing');
-                    }
-                }
-            }
-        };
-
-        // 釣り画面のスワイプ設定
-        const fishingScreen = document.getElementById('fishing-screen');
-        if (fishingScreen) {
-            fishingScreen.addEventListener('touchstart', handleTouchStart, { passive: true });
-            fishingScreen.addEventListener('touchend', handleTouchEnd, { passive: true });
+        const powerDisplay = document.getElementById('power-display');
+        if (powerDisplay) {
+            powerDisplay.textContent = `${GameState.getTotalPower()} P`;
         }
+    },
 
-        // ショップ画面のスワイプ設定
-        const shopScreen = document.getElementById('shop-screen');
-        if (shopScreen) {
-            shopScreen.addEventListener('touchstart', handleTouchStart, { passive: true });
-            shopScreen.addEventListener('touchend', handleTouchEnd, { passive: true });
+    // ラウンドと目標の進み具合
+    updateRunPanel() {
+        const run = GameState.run;
+        if (!run) return;
+
+        const finalRound = GAME_DATA.ROGUE_CONFIG.finalRound;
+        const label = document.getElementById('round-label');
+        const text = document.getElementById('round-progress-text');
+        const bar = document.getElementById('round-progress-bar');
+
+        if (label) label.textContent = run.round <= finalRound ? `ROUND ${run.round} / ${finalRound}` : `ROUND ${run.round}（エンドレス）`;
+        if (text) text.textContent = `${run.earned.toLocaleString()} / ${run.target.toLocaleString()} G`;
+        if (bar) bar.style.width = `${Math.min(100, (run.earned / run.target) * 100)}%`;
+    },
+
+    // 餌セレクター（所持している餌の切り替えと残り数）
+    updateBaitInfo() {
+        const baitInfo = document.getElementById('bait-info');
+        if (!baitInfo) return;
+
+        const bait = GAME_DATA.BAITS.find(b => b.id === GameState.baitType) || GAME_DATA.BAITS[0];
+        const count = GameState.getBaitCount(bait.id);
+        const total = GameState.getTotalBaitCount();
+        const ownedTypes = GAME_DATA.BAITS.filter(b => GameState.getBaitCount(b.id) > 0).length;
+        const arrowsHidden = ownedTypes <= 1 ? 'style="visibility: hidden;"' : '';
+
+        baitInfo.innerHTML = `
+            <button class="selector-btn prev" ${arrowsHidden} onclick="GameState.switchBait(-1); UIManager.updateBaitInfo();"><span class="material-icons">chevron_left</span></button>
+            <span class="bait-label-container">
+                <span class="bait-name-text">${bait.name}</span>
+                <span class="bait-count-text">× ${count}</span>
+            </span>
+            <button class="selector-btn next" ${arrowsHidden} onclick="GameState.switchBait(1); UIManager.updateBaitInfo();"><span class="material-icons">chevron_right</span></button>
+        `;
+
+        const totalEl = document.getElementById('bait-total');
+        if (totalEl) {
+            totalEl.textContent = `残りの餌 合計 ${total}`;
+            totalEl.classList.toggle('rg-low', total <= 3);
         }
     },
 
@@ -545,7 +364,7 @@ const UIManager = {
     // ========================================
     // 釣り上げ成功
     // ========================================
-    showCatchSuccess(fish, onClose, count = 1, extraRewards = []) {
+    showCatchSuccess(fish, onClose, count = 1, extraRewards = [], earned = fish.price) {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
@@ -562,7 +381,6 @@ const UIManager = {
             const rewardItemsHtml = extraRewards.map(reward => {
                 let icon = 'card_giftcard';
                 if (reward.type === 'money') icon = 'paid';
-                else if (reward.type === 'ticket') icon = 'confirmation_number';
                 else if (reward.type === 'skill') icon = 'auto_fix_high';
                 else if (reward.type === 'bait') icon = 'set_meal';
                 
@@ -612,8 +430,8 @@ const UIManager = {
                                 <span class="value">${fish.power}</span>
                             </div>
                             <div class="stat-item">
-                                <span class="label">VALUE</span>
-                                <span class="value">¥${fish.price.toLocaleString()}</span>
+                                <span class="label">水揚げ</span>
+                                <span class="value">+${earned.toLocaleString()} G</span>
                             </div>
                         </div>
 
@@ -627,7 +445,6 @@ const UIManager = {
 
         // クリックとスペースキーで閉じる
         this.setupResultOverlayClose(onClose);
-        this.updateInventory();
     },
 
     // ========================================
@@ -742,74 +559,6 @@ const UIManager = {
     },
 
     // ========================================
-    // ガチャ結果表示
-    // ========================================
-    showGachaResult(items, onClose) {
-        // 結果リストのHTML生成
-        const itemsHtml = items.map(item => {
-            let icon = 'auto_awesome';
-            let typeLabel = 'Skill';
-
-            if (item.category === 'skin') {
-                icon = 'palette';
-                typeLabel = 'Skin';
-            } else if (item.category === 'sky') {
-                icon = 'cloud';
-                typeLabel = 'Sky';
-            }
-
-            return `
-            <div class="gacha-result-item rarity-${item.tier === 3 ? 'S' : item.tier === 2 ? 'B' : 'D'}">
-                <div class="gacha-item-icon">
-                    <span class="material-icons">${icon}</span>
-                </div>
-                <div class="gacha-item-info">
-                    <div class="gacha-item-name">${item.name}</div>
-                    <div class="gacha-item-tier">Tier ${item.tier} (${typeLabel})</div>
-                </div>
-                ${item.isNew ? '<span class="new-badge">NEW!</span>' : '<span class="status-badge">済み</span>'}
-            </div>
-        `}).join('');
-
-        // インベントリに加算
-        items.forEach(item => {
-            GameState.gainGachaResult(item);
-        });
-
-        // 既存のオーバーレイがあれば削除
-        const existing = document.getElementById('result-overlay');
-        if (existing) existing.remove();
-
-        const overlay = document.createElement('div');
-        overlay.id = 'result-overlay';
-        overlay.className = 'result-overlay gacha-result';
-        // オーバーレイのスタイルを強制適用（CSSクラスがfishing-area依存の場合に備えて）
-        overlay.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); z-index: 3000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            opacity: 0; animation: fadeIn 0.3s forwards;
-        `;
-
-        overlay.innerHTML = `
-            <div class="result-card gacha-card">
-                <div class="card-header">GACHA RESULT</div>
-                
-                <div class="gacha-items-grid">
-                    ${itemsHtml}
-                </div>
-
-                <div class="tap-hint">TAP TO CLOSE</div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-
-        this.setupResultOverlayClose(onClose);
-        this.updateStatus();
-    },
-
-    // ========================================
     // 宝箱結果表示
     // ========================================
     showTreasureResult(chest, results, onClose) {
@@ -892,154 +641,6 @@ const UIManager = {
     },
 
     // ========================================
-    // ステータス表示更新
-    // ========================================
-    // ステータスの更新 (お金・チケット)
-    updateStatus() {
-        this.updateMoney();
-        // チケット表示があれば更新
-        const ticketDisplay = document.getElementById('gacha-ticket-display');
-        if (ticketDisplay) {
-            ticketDisplay.textContent = GameState.gachaTickets;
-        }
-        this.updateInventory();
-        this.updateRodInfo();
-        this.updateBaitInfo();
-        this.updateRankInfo();
-    },
-
-    // ========================================
-    // 所持金更新
-    // ========================================
-    // ========================================
-    // 所持金変動演出
-    // ========================================
-    showMoneyPopup(diff) {
-        if (diff === 0) return;
-
-        const isPlus = diff > 0;
-        const text = isPlus ? `+${diff.toLocaleString()}` : `${diff.toLocaleString()}`;
-        const color = isPlus ? '#4ade80' : '#f87171'; // Green : Red
-
-        // Popup targets (Main money display and Casino header)
-        const targets = [
-            document.querySelector('.shop-money'),
-            document.querySelector('#casino-screen .shop-money')
-        ];
-
-        targets.forEach(container => {
-            if (!container) return;
-
-            const popup = document.createElement('span');
-            popup.className = 'money-popup';
-            popup.textContent = text;
-            popup.style.color = color;
-
-            container.style.position = 'relative'; // Ensure relative positioning
-            container.appendChild(popup);
-
-            // Remove after animation
-            setTimeout(() => {
-                popup.remove();
-            }, 1500);
-        });
-    },
-
-    // ========================================
-    // 所持金更新
-    // ========================================
-    updateMoney() {
-        // Delta popup
-        if (this.lastMoney !== null && this.lastMoney !== GameState.money) {
-            const diff = GameState.money - this.lastMoney;
-            this.showMoneyPopup(diff);
-        }
-        this.lastMoney = GameState.money;
-
-        const moneyDisplay = document.getElementById('money-display');
-        if (moneyDisplay) {
-            moneyDisplay.textContent = `${GameState.money.toLocaleString()} G`;
-        }
-        // ショップ画面の所持金も更新
-        const shopMoneyDisplay = document.getElementById('shop-money-display');
-        if (shopMoneyDisplay) {
-            shopMoneyDisplay.textContent = `¥${GameState.money.toLocaleString()}`;
-        }
-        // カジノ画面の所持金も更新
-        const casinoMoneyDisplay = document.getElementById('casino-money-display');
-        if (casinoMoneyDisplay) {
-            casinoMoneyDisplay.textContent = `¥${GameState.money.toLocaleString()}`;
-        }
-
-        // パワー表示も更新
-        const powerDisplay = document.getElementById('power-display');
-        if (powerDisplay) {
-            powerDisplay.textContent = `${GameState.getTotalPower()} P`;
-        }
-        if (powerDisplay) {
-            powerDisplay.textContent = `${GameState.getTotalPower()} P`;
-        }
-    },
-
-    // ========================================
-    // ランク表示更新
-    // ========================================
-    updateRankInfo() {
-        let rankDisplay = document.getElementById('rank-display');
-        if (!rankDisplay) {
-            // Create if missing, try to place near power-display
-            const powerDisplay = document.getElementById('power-display');
-            if (powerDisplay && powerDisplay.parentNode) {
-                rankDisplay = document.createElement('div');
-                rankDisplay.id = 'rank-display';
-                rankDisplay.className = 'status-item';
-                rankDisplay.style.marginRight = '10px';
-                rankDisplay.style.fontWeight = 'bold';
-                rankDisplay.style.color = '#fbbf24'; // Goldish
-                // Insert before power display
-                powerDisplay.parentNode.insertBefore(rankDisplay, powerDisplay);
-            } else {
-                return; // Can't find place
-            }
-        }
-        const nextExp = GameState.getNextRankExp ? GameState.getNextRankExp() : '-';
-        const percent = GameState.getNextRankExp ? Math.floor((GameState.exp / GameState.getNextRankExp()) * 100) : 0;
-        rankDisplay.innerHTML = `RANK ${GameState.rank} <span style="font-size:0.8em; opacity:0.8;">(${percent}%)</span>`;
-    },
-
-    // ========================================
-    // ランクアップ演出
-    // ========================================
-    // ========================================
-    // ランクアップ演出
-    // ========================================
-    showRankUp(newRank, coinReward, ticketReward) {
-        const rewards = [
-            { icon: '⭐', name: `Rank ${newRank}!` },
-            { icon: '💰', name: `${coinReward.toLocaleString()}G` }
-        ];
-
-        if (ticketReward > 0) {
-            rewards.push({ icon: '🎫', name: `x${ticketReward}` });
-        }
-
-        this.showRewardPopup('RANK UP!', rewards, 'パワーボーナス & 報酬獲得！');
-
-        // エフェクト（紙吹雪などあればベストだが、簡易的にメッセージ）
-        this.updateRankInfo();
-    },
-
-    // ========================================
-    // インベントリ更新
-    // ========================================
-    updateInventory() {
-        const inventoryCount = document.getElementById('inventory-count');
-        if (inventoryCount) {
-            inventoryCount.textContent = `${GameState.inventory.length} 匹`;
-        }
-    },
-
-    // ========================================
     // 釣り竿情報更新
     // ========================================
     updateRodInfo() {
@@ -1060,94 +661,6 @@ const UIManager = {
             <span class="rod-name">${rod.name}</span>
             <div class="rod-stars">${starsHtml}</div>
         `;
-    },
-
-    // ========================================
-    // 餌情報更新（セレクター表示）
-    // ========================================
-    updateBaitInfo() {
-        const baitInfo = document.getElementById('bait-info');
-        if (!baitInfo) return;
-
-        const currentBaitId = GameState.baitType;
-        const bait = GAME_DATA.BAITS.find(b => b.id === currentBaitId);
-        const count = GameState.getCurrentBaitCount();
-        const displayCount = count === -1 ? '∞' : count;
-
-        // user's new UI expects: BAIT (pseudo) < content >
-        // We inject the buttons and the text.
-        baitInfo.innerHTML = `
-            <button class="selector-btn prev" onclick="GameState.switchBait(-1); UIManager.updateBaitInfo();"><span class="material-icons">chevron_left</span></button>
-            <span class="bait-label-container" onclick="UIManager.showBaitPurchaseDialog('${currentBaitId}')" style="cursor: pointer;">
-                <span class="bait-name-text">${bait.name}</span>
-                <span class="bait-count-text">× ${displayCount}</span>
-            </span>
-            <button class="selector-btn next" onclick="GameState.switchBait(1); UIManager.updateBaitInfo();"><span class="material-icons">chevron_right</span></button>
-        `;
-    },
-
-    // ========================================
-    // 餌購入ダイアログを表示
-    // ========================================
-    showBaitPurchaseDialog(baitId) {
-        const bait = GAME_DATA.BAITS.find(b => b.id === baitId);
-        if (!bait) return;
-
-        // Dランク（無限）は購入不可
-        if (bait.rank === 'D') {
-            // 無限なので何もしない
-            return;
-        }
-
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.id = 'bait-purchase-modal';
-
-        // 単価 (セット価格 / 個数)
-        const unitPrice = bait.quantity > 0 ? bait.price / bait.quantity : 0;
-
-        overlay.innerHTML = `
-            <div class="modal-content">
-                <h3>餌を購入</h3>
-                <p>${bait.name} が不足しています。</p>
-                <p>購入しますか？</p>
-                
-                <div class="purchase-options">
-                    <div class="option" data-amount="${bait.quantity}">
-                        <span class="amount">${bait.quantity}個</span>
-                        <span class="price">¥${bait.price}</span>
-                    </div>
-                    <div class="option" data-amount="${bait.quantity * 5}">
-                        <span class="amount">${bait.quantity * 5}個</span>
-                        <span class="price">¥${bait.price * 5}</span>
-                    </div>
-                     <div class="option" data-amount="${bait.quantity * 10}">
-                        <span class="amount">${bait.quantity * 10}個</span>
-                        <span class="price">¥${bait.price * 10}</span>
-                    </div>
-                </div>
-
-                <div class="modal-actions">
-                    <button class="btn-cancel" onclick="document.getElementById('bait-purchase-modal').remove()">キャンセル</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-
-        // 購入オプションのイベントリスナ
-        overlay.querySelectorAll('.option').forEach(option => {
-            option.addEventListener('click', () => {
-                const amount = parseInt(option.dataset.amount);
-                if (GameState.buyBait(baitId, amount)) {
-                    this.showMessage(`${bait.name}を${amount}個購入しました！`);
-                    this.updateStatus(); // お金と餌の表示更新
-                    overlay.remove();
-                } else {
-                    this.showMessage('お金が足りません！');
-                }
-            });
-        });
     },
 
     // ========================================
@@ -1322,240 +835,6 @@ const UIManager = {
     },
 
     // ========================================
-    // 実績画面のレンダリング
-    // ========================================
-    renderStats() {
-        const container = document.getElementById('stats-container');
-        if (!container) return;
-
-        const stats = {
-            '累計釣り上げ数': `${GameState.totalFishCaught} 匹`,
-            '累計宝箱取得数': `${GameState.totalTreasure} 個`,
-            '累計獲得スキル数': `${GameState.totalSkills} 個`,
-            '累計獲得コイン': `${GameState.totalCoinsEarned.toLocaleString()} G`,
-            '最大釣り上げサイズ': GameState.biggestFish ? `${GameState.biggestFish.name} (${GameState.biggestFish.power})` : 'なし',
-            'カジノ累計勝利額': `${GameState.casinoTotalWin.toLocaleString()} G`,
-            'カジノ累計敗北額': `${GameState.casinoTotalLoss.toLocaleString()} G`,
-            'ガシャチケット所持数': `${GameState.gachaTickets} 枚`
-        };
-
-        const rankStats = GameState.caughtByRank;
-        const ranksHtml = Object.entries(rankStats).map(([rank, count]) => `
-            <div class="stat-row">
-                <span class="stat-label rank-label rarity-${rank}">Rank ${rank}</span>
-                <span class="stat-value">${count} 匹</span>
-            </div>
-        `).join('');
-
-        let html = '<div class="stats-group"><h3>総合統計</h3>';
-        for (const [label, value] of Object.entries(stats)) {
-            html += `
-                <div class="stat-row">
-                    <span class="stat-label">${label}</span>
-                    <span class="stat-value">${value}</span>
-                </div>
-            `;
-        }
-        html += '</div>';
-
-        html += '<div class="stats-group"><h3>ランク別釣り上げ数</h3>';
-        html += ranksHtml;
-        html += '</div>';
-
-        container.innerHTML = html;
-    },
-
-    // ========================================
-    // ガチャ演出と結果表示
-    // ========================================
-    prepareGachaScreen() {
-        const handle = document.getElementById('gacha-handle');
-        const machineContainer = document.getElementById('gacha-machine-container');
-        const resultDisplay = document.getElementById('gacha-result-display');
-
-        machineContainer.classList.remove('hidden');
-        resultDisplay.classList.add('hidden');
-        handle.classList.remove('spinning');
-
-        // カプセルをランダムに配置
-        const capsuleContainer = document.getElementById('capsule-container');
-        capsuleContainer.innerHTML = '';
-        const colors = ['#f87171', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa'];
-        for (let i = 0; i < 20; i++) {
-            const cap = document.createElement('div');
-            cap.className = 'gacha-capsule';
-            cap.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-            cap.style.left = Math.random() * 150 + 'px';
-            cap.style.top = Math.random() * 130 + 'px';
-            capsuleContainer.appendChild(cap);
-        }
-    },
-
-    startGachaPerformance(results, onComplete) {
-        const handle = document.getElementById('gacha-handle');
-        const machineContainer = document.getElementById('gacha-machine-container');
-        const resultDisplay = document.getElementById('gacha-result-display');
-
-        // ハンドルを回す
-        handle.classList.add('spinning');
-
-        // 演出ウェイト
-        setTimeout(() => {
-            handle.classList.remove('spinning');
-
-            // マシンを隠して結果を表示
-            machineContainer.classList.add('hidden');
-            resultDisplay.classList.remove('hidden');
-
-            this.renderGachaResults(results);
-
-            // 閉じるボタン
-            const closeBtn = document.getElementById('gacha-close-btn');
-            closeBtn.onclick = () => {
-                this.showScreen('shop'); // ショップに戻る
-                if (onComplete) onComplete();
-            };
-        }, 1500);
-    },
-
-    renderGachaResults(results) {
-        const container = document.getElementById('gacha-items-container');
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        results.forEach(item => {
-            // ガチャ結果を GameState に反映（所持数追加）
-            GameState.gainGachaResult(item);
-
-            const ownedCount = GameState.getSkillCount(item.id);
-
-            const card = document.createElement('div');
-            card.className = `gacha-result-card rarity-${item.rarity || 'C'} ${item.isNew ? 'is-new' : ''}`;
-
-            card.innerHTML = `
-                <div class="item-icon">
-                    <span class="material-icons">${item.icon || 'auto_awesome'}</span>
-                </div>
-                <div class="item-name">${item.name}</div>
-                <div class="owned-count">所持: ${ownedCount}</div>
-            `;
-            container.appendChild(card);
-        });
-    },
-
-    // ========================================
-    // ミッションUIの更新
-    // ========================================
-    updateMissionUI() {
-        const missionDisplay = document.getElementById('mission-display');
-        const missionText = document.getElementById('mission-text');
-        if (!missionDisplay || !missionText) return;
-
-        // 初心者ミッションの場合
-        const beginnerTexts = MissionManager.getCurrentMissionTexts();
-        if (beginnerTexts !== null) {
-            missionDisplay.classList.remove('dynamic-mode');
-
-            // 3つのミッションをリスト表示
-            let html = '';
-            beginnerTexts.forEach(text => {
-                html += `<div class="mission-item-row"><span class="material-icons mission-icon-small">check_circle_outline</span> ${text}</div>`;
-            });
-            missionText.innerHTML = html;
-            return;
-        }
-
-        // 動的ミッションの場合
-        if (MissionManager.isDynamicMissionActive()) {
-            missionDisplay.classList.add('dynamic-mode');
-            const missions = GameState.dynamicMissions;
-            let html = '';
-            ['A', 'B', 'C'].forEach(slot => {
-                const m = missions[slot];
-                if (!m) return;
-                const isTicket = m.reward.type === 'ticket';
-                const progressText = `${m.current}/${m.target}`;
-                html += `
-                    <div class="dynamic-mission-item ${isTicket ? 'ticket-reward' : ''}">
-                        <span class="slot-label">${slot}</span>
-                        <span class="mission-desc">${m.text} (${progressText})</span>
-                        ${isTicket ? '<span class="reward-icon">🎫</span>' : ''}
-                    </div>
-                `;
-            });
-            missionText.innerHTML = html;
-        } else {
-            missionText.textContent = '全てのミッションを達成しました！';
-        }
-    },
-
-    // = ::::::::::::::::::::::::::::::::::::::::
-    // ヘルプの表示
-    // ::::::::::::::::::::::::::::::::::::::::
-    showHelp() {
-        this.showMessage('ヘルプ: 画面をタップしてキャストし、タイミングよくタップして魚を釣りましょう！');
-        MissionManager.checkMission('help_click');
-    },
-
-    // UIの初期化
-    init() {
-        // スタート画面の初期化
-        this.initStartScreen();
-
-        // ミッションUIの初期更新
-        this.updateMissionUI();
-
-        // ボタンのイベントリスナー設定
-        document.getElementById('encyclopedia-back-btn')?.addEventListener('click', () => {
-            this.showScreen('fishing'); // 釣り画面に戻る
-        });
-
-        document.getElementById('stats-back-btn')?.addEventListener('click', () => {
-            this.showScreen('encyclopedia');
-        });
-
-        document.getElementById('help-btn')?.addEventListener('click', () => {
-            this.showHelp();
-        });
-
-        // ガチャ画面のハンドルクリックでも回せるようにする
-        document.getElementById('gacha-handle')?.addEventListener('click', () => {
-            // すでに回っているか結果表示中なら無視
-            const handle = document.getElementById('gacha-handle');
-            if (handle.classList.contains('spinning')) return;
-            const resultDisplay = document.getElementById('gacha-result-display');
-            if (!resultDisplay.classList.contains('hidden')) return;
-
-            // FIXME: ここで回すのは ShopManager 経由が良いが、
-            // 演出中のハンドルクリックを「確定」などの操作に割り当てることも可能
-        });
-    },
-    // ========================================
-    // 報酬獲得ポップアップ
-    // ========================================
-    // ========================================
-    // 報酬獲得ポップアップ (通知バナー版)
-    // ========================================
-    showRewardPopup(title, items, missionName = '') {
-        console.log('🎉 showRewardPopup called:', title, items, missionName);
-        
-        // 通知バナーに表示するテキストを作成
-        let message = '';
-        if (missionName) {
-            message += `${missionName}\n`;
-        }
-        
-        const rewardsText = items.map(item => `${item.name}`).join(', ');
-        if (rewardsText) {
-            message += `報酬: ${rewardsText}`;
-        }
-
-        // 通知を表示
-        this.showNotification(title, message, 'emoji_events', 4000);
-    },
-
-    // ========================================
     // ヘルプ画面
     // ========================================
     openHelp() {
@@ -1631,146 +910,8 @@ const UIManager = {
     }
 };
 
-// CSSを動的に追加（stats-container用）
-const statsStyles = document.createElement('style');
-statsStyles.textContent = `
-    .stats-container {
-        padding: 16px;
-        color: var(--text-primary);
-    }
-    .stats-group {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    .stats-group h3 {
-        margin-top: 0;
-        margin-bottom: 12px;
-        color: #ffd700;
-        font-size: 1.1rem;
-        border-bottom: 1px solid rgba(255, 215, 0, 0.3);
-        padding-bottom: 4px;
-    }
-    .stat-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .stat-row:last-child {
-        border-bottom: none;
-    }
-    .stat-label {
-        color: var(--text-secondary);
-        font-size: 0.9rem;
-    }
-    .stat-value {
-        font-weight: bold;
-        color: var(--text-primary);
-    }
-`;
-document.head.appendChild(statsStyles);
-
-// 報酬ポップアップ用CSS
-const rewardPopupStyles = document.createElement('style');
-rewardPopupStyles.textContent = `
-    .reward-popup-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        opacity: 0;
-        transition: opacity 0.3s;
-    }
-    .reward-popup-overlay.show {
-        opacity: 1;
-    }
-    .reward-popup {
-        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-        border: 3px solid #ffd700;
-        border-radius: 20px;
-        padding: 32px 40px;
-        text-align: center;
-        transform: scale(0.8);
-        transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-        box-shadow: 0 0 30px rgba(255, 215, 0, 0.4), 0 10px 40px rgba(0,0,0,0.5);
-        min-width: 280px;
-        max-width: 90%;
-    }
-    .reward-popup-overlay.show .reward-popup {
-        transform: scale(1);
-    }
-    .reward-title {
-        color: #ffd700;
-        font-size: 1.6rem;
-        font-weight: bold;
-        margin-bottom: 20px;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
-        letter-spacing: 2px;
-    }
-    .reward-content {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-    .reward-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    .reward-icon-container {
-        font-size: 3rem;
-        margin-bottom: 8px;
-        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6));
-        animation: rewardBounce 0.5s ease-out;
-    }
-    @keyframes rewardBounce {
-        0% { transform: scale(0); }
-        50% { transform: scale(1.2); }
-        100% { transform: scale(1); }
-    }
-    .reward-name {
-        color: #fff;
-        font-size: 1.1rem;
-        font-weight: bold;
-    }
-    .reward-close-btn {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        color: white;
-        border: none;
-        padding: 12px 32px;
-        border-radius: 25px;
-        font-size: 1rem;
-        font-weight: bold;
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
-    }
-    .reward-close-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
-    }
-    .reward-mission-name {
-        color: #e0e7ff;
-        font-size: 1.1rem;
-        margin-bottom: 16px;
-    }
-`;
-document.head.appendChild(rewardPopupStyles);
 
 // グローバルに公開
 if (typeof window !== 'undefined') {
     window.UIManager = UIManager;
 }
-UIManager.init();

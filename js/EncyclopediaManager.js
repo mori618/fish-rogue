@@ -108,10 +108,6 @@ const EncyclopediaManager = {
                     <span style="color: #ffd700; font-weight: bold; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);">
                         ヌシ種: ${caughtSpecialCount}
                     </span>
-                    <button class="btn-main" style="padding: 4px 12px; font-size: 12px; margin-left: 10px;" onclick="UIManager.showScreen('stats')">
-                        <span class="material-icons" style="font-size: 16px; vertical-align: middle;">query_stats</span>
-                        戦績・実績を見る
-                    </button>
                 </div>
             `;
         }
