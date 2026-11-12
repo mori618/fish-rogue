@@ -1,0 +1,10 @@
+﻿ID,名前,Tier,対応ロッドID,説明,ガチャ限定
+skin_default,ノーマル,1,wooden_rod,標準的な釣竿とウキのセット,-
+skin_bamboo,バンブー,1,bamboo_rod,自然を感じる竹の色合い,-
+skin_carbon,カーボン,2,carbon_rod,クールな黒と未来的な青,-
+skin_titanium,チタン,3,titanium_rod,高級感あふれる金属光沢,-
+skin_legendary,レジェンド,3,legendary_rod,伝説の釣り人に相応しい神秘的な色,-
+skin_neon,ネオンライト,2,-,夜に輝くネオンカラー,〇
+skin_gold_rush,ゴールドラッシュ,3,-,全身が黄金に輝く成金仕様,〇
+skin_void,ヴォイド,3,-,光を吸収する漆黒のロッド,〇
+skin_cherry,桜まつり,1,-,春を感じさせる桜色,〇

@@ -1,0 +1,318 @@
+:root {
+    --chinchiro-gold: #d4af37;
+    --chinchiro-crimson: #a01a1a;
+    --chinchiro-dice-bg: #ffffff;
+    --chinchiro-dice-dot: #1a1a1a;
+    --chinchiro-dice-red: #e63946;
+    --chinchiro-panel-bg: rgba(255, 255, 255, 0.05);
+}
+
+#chinchiro-container {
+    width: 100%;
+    max-width: 600px;
+    /* Increased slightly for better fit */
+    margin: 0 auto;
+    background: radial-gradient(circle at center, #2c0000 0%, #000 100%);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+    border: 2px solid #333;
+    border-radius: 12px;
+    overflow: hidden;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: white;
+}
+
+#chinchiro-container header {
+    padding: 15px;
+    text-align: center;
+    border-bottom: 2px solid var(--chinchiro-gold);
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10;
+}
+
+#chinchiro-container .title {
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: var(--chinchiro-gold);
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    margin: 0;
+}
+
+#chinchiro-container .balance {
+    font-size: 16px;
+    color: #ccc;
+    margin-top: 4px;
+}
+
+#chinchiro-container .battle-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+    padding: 20px;
+    position: relative;
+    min-height: 400px;
+}
+
+#chinchiro-container .opponent-area,
+#chinchiro-container .player-area {
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    border-radius: 15px;
+    background: var(--chinchiro-panel-bg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s;
+}
+
+#chinchiro-container .active-turn {
+    background: rgba(212, 175, 55, 0.15);
+    border-color: var(--chinchiro-gold);
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.3);
+    z-index: 2;
+}
+
+#chinchiro-container .label {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--chinchiro-gold);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+#chinchiro-container .hand-status {
+    font-size: 24px;
+    font-weight: 900;
+    height: 36px;
+    margin-top: 10px;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Rename bowl ID in CSS to match what we will use in HTML */
+#chinchiro-bowl {
+    width: 220px;
+    height: 120px;
+    background: radial-gradient(circle at center, #555 0%, #111 80%, #000 100%);
+    border: 8px solid #333;
+    border-radius: 50% / 35%;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9);
+    margin: 20px 0;
+    overflow: visible;
+}
+
+#chinchiro-bowl.shaking {
+    animation: bowl-shake 0.1s infinite;
+}
+
+@keyframes bowl-shake {
+    0% {
+        transform: translate(3px, 3px) rotate(1deg);
+    }
+
+    50% {
+        transform: translate(-3px, -3px) rotate(-1deg);
+    }
+
+    100% {
+        transform: translate(3px, -3px) rotate(1deg);
+    }
+}
+
+#chinchiro-container .dice-container {
+    display: flex;
+    gap: 12px;
+    z-index: 5;
+}
+
+#chinchiro-container .dice {
+    width: 44px;
+    height: 44px;
+    background-color: var(--chinchiro-dice-bg);
+    border-radius: 6px;
+    position: relative;
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s;
+}
+
+#chinchiro-container .dot-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 80%;
+    height: 80%;
+}
+
+#chinchiro-container .dot {
+    background-color: var(--chinchiro-dice-dot);
+    border-radius: 50%;
+    width: 6px;
+    height: 6px;
+    align-self: center;
+    justify-self: center;
+    visibility: hidden;
+}
+
+/* Dice dots visibility logic */
+#chinchiro-container .dice[data-value="1"] .dot:nth-child(5) {
+    visibility: visible;
+    background-color: var(--chinchiro-dice-red);
+    width: 12px;
+    height: 12px;
+}
+
+#chinchiro-container .dice[data-value="2"] .dot:nth-child(1),
+#chinchiro-container .dice[data-value="2"] .dot:nth-child(9) {
+    visibility: visible;
+}
+
+#chinchiro-container .dice[data-value="3"] .dot:nth-child(1),
+#chinchiro-container .dice[data-value="3"] .dot:nth-child(5),
+#chinchiro-container .dice[data-value="3"] .dot:nth-child(9) {
+    visibility: visible;
+}
+
+#chinchiro-container .dice[data-value="4"] .dot:nth-child(1),
+#chinchiro-container .dice[data-value="4"] .dot:nth-child(3),
+#chinchiro-container .dice[data-value="4"] .dot:nth-child(7),
+#chinchiro-container .dice[data-value="4"] .dot:nth-child(9) {
+    visibility: visible;
+}
+
+#chinchiro-container .dice[data-value="5"] .dot:nth-child(1),
+#chinchiro-container .dice[data-value="5"] .dot:nth-child(3),
+#chinchiro-container .dice[data-value="5"] .dot:nth-child(5),
+#chinchiro-container .dice[data-value="5"] .dot:nth-child(7),
+#chinchiro-container .dice[data-value="5"] .dot:nth-child(9) {
+    visibility: visible;
+}
+
+#chinchiro-container .dice[data-value="6"] .dot:nth-child(1),
+#chinchiro-container .dice[data-value="6"] .dot:nth-child(3),
+#chinchiro-container .dice[data-value="6"] .dot:nth-child(4),
+#chinchiro-container .dice[data-value="6"] .dot:nth-child(6),
+#chinchiro-container .dice[data-value="6"] .dot:nth-child(7),
+#chinchiro-container .dice[data-value="6"] .dot:nth-child(9) {
+    visibility: visible;
+}
+
+#chinchiro-battle-result {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    pointer-events: none;
+    text-align: center;
+    width: 100%;
+}
+
+#chinchiro-container .result-text {
+    font-size: 72px;
+    font-weight: 900;
+    opacity: 0;
+    transform: scale(3);
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-shadow: 0 0 30px rgba(0, 0, 0, 1);
+}
+
+#chinchiro-container .result-text.win {
+    color: #f9d423;
+    opacity: 1;
+    transform: scale(1);
+}
+
+#chinchiro-container .result-text.lose {
+    color: #ff4e50;
+    opacity: 1;
+    transform: scale(1);
+}
+
+#chinchiro-container .result-text.draw {
+    color: #aaa;
+    opacity: 1;
+    transform: scale(1);
+}
+
+#chinchiro-container .controls {
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.95);
+    border-top: 1px solid var(--chinchiro-gold);
+}
+
+#chinchiro-container .bet-selector {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+    /* スクロールバー非表示 */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    padding-bottom: 5px;
+}
+
+#chinchiro-container .bet-btn {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid #444;
+    color: #888;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-weight: bold;
+}
+
+#chinchiro-container .bet-btn.active {
+    border-color: var(--chinchiro-gold);
+    color: var(--chinchiro-gold);
+    background: rgba(212, 175, 55, 0.15);
+}
+
+#chinchiro-container .roll-btn {
+    width: 100%;
+    padding: 18px;
+    font-size: 22px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--chinchiro-gold) 0%, #b8860b 100%);
+    border: none;
+    border-radius: 10px;
+    color: #000;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+#chinchiro-container .roll-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}
+
+#chinchiro-container .roll-btn:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+#chinchiro-container .message-log {
+    text-align: center;
+    font-size: 15px;
+    color: #ccc;
+    margin-bottom: 15px;
+    height: 24px;
+    font-weight: 500;
+}

@@ -1,0 +1,238 @@
+ID,名前,Tier,価格,効果タイプ,効果値,説明,グループ,アイコン
+cosmic_blessing,宇宙の加護,0,250000,cosmic_blessing,,"フィーバー中、30%の確率でゲージがLv6にリセットされる",特殊スキル,workspace_premium
+eternal_mania,永遠の熱狂,0,200000,eternal_mania,,"フィーバー終了時にゲージが4溜まった状態になる",特殊スキル,workspace_premium
+good_feel,手応え,0,200000,good_feel,,"パワー2倍 & ガチャチケットのドロップを確定させる",特殊スキル,workspace_premium
+hard_mode,ハードモード,0,500000,hard_mode,,"パワー5倍 & 魚の売却額8倍",特殊スキル,workspace_premium
+infinite_bait,無限餌,0,250000,infinite_bait,,"釣り時に餌を消費しなくなる",特殊スキル,workspace_premium
+magnet,マグネット,0,200000,magnet,,"宝箱の抽選から木の宝箱を除外する",特殊スキル,workspace_premium
+master_angler_special,太公望,0,250000,master_angler_special,,"釣果が常に2倍になり、ドロップ獲得量も2倍になる",特殊スキル,workspace_premium
+master_needle,達人の針,0,150000,master_needle,,"ゲージ赤ゾーンで停止時、捕獲率が100%になる",特殊スキル,workspace_premium
+mobile_shop,出張売店,0,150000,mobile_shop,,"釣り上げ成功時に自動で魚を売却する",特殊スキル,workspace_premium
+perpetual_engine,永久機関,0,300000,perpetual_engine,,"船の燃料を消費しなくなる",特殊スキル,workspace_premium
+rank_sniper_a,Aランクスナイパー,0,200000,rank_sniper_fixed,,"Aランクの魚しか釣れなくなる",特殊スキル,workspace_premium
+rank_sniper_b,Bランクスナイパー,0,150000,rank_sniper_fixed,,"Bランクの魚しか釣れなくなる",特殊スキル,workspace_premium
+rank_sniper_c,Cランクスナイパー,0,120000,rank_sniper_fixed,,"Cランクの魚しか釣れなくなる",特殊スキル,workspace_premium
+rank_sniper_s,Sランクスナイパー,0,300000,rank_sniper_fixed,,"Sランクの魚しか釣れなくなる",特殊スキル,workspace_premium
+gauge_slow_1,ゲージ減速 I,1,300,gauge_slow,0.1,"ゲージ速度-10%",強化グループ,bolt
+gauge_slow_2,ゲージ減速 II,2,1000,gauge_slow,0.2,"ゲージ速度-20%",強化グループ,bolt
+gauge_slow_3,ゲージ減速 III,3,5000,gauge_slow,0.3,"ゲージ速度-30%",強化グループ,bolt
+gauge_slow_4,ゲージ減速 極,4,15000,gauge_slow,0.45,"ゲージ速度-45%",強化グループ,bolt
+overdrive_1,オーバードライブ I,1,1000,overdrive,0.15,"パワー+15% & ゲージ速度+5%",強化グループ,bolt
+overdrive_2,オーバードライブ II,2,4000,overdrive,0.3,"パワー+30% & ゲージ速度+10%",強化グループ,bolt
+overdrive_3,オーバードライブ III,3,10000,overdrive,0.5,"パワー+50% & ゲージ速度+20%",強化グループ,bolt
+overdrive_4,オーバードライブ 極,4,30000,overdrive,1,"パワー+100% & ゲージ速度+30%",強化グループ,bolt
+patience_1,忍耐力 I,1,400,wait_time_reduction,0.1,"待ち時間を10%短縮",強化グループ,bolt
+patience_2,忍耐力 II,2,1500,wait_time_reduction,0.25,"待ち時間を25%短縮",強化グループ,bolt
+patience_3,忍耐力 III,3,4000,wait_time_reduction,0.4,"待ち時間を40%短縮",強化グループ,bolt
+patience_4,忍耐力 極,4,15000,wait_time_reduction,0.6,"待ち時間を60%短縮",強化グループ,bolt
+power_up_1,パワーUP I,1,200,power_boost,5,"釣りパワー+5",強化グループ,bolt
+power_up_2,パワーUP II,2,800,power_boost,15,"釣りパワー+15",強化グループ,bolt
+power_up_3,パワーUP III,3,2500,power_boost,30,"釣りパワー+30",強化グループ,bolt
+power_up_4,パワーUP 極,4,10000,power_boost,60,"釣りパワー+60",強化グループ,bolt
+quick_hit_penalty_1,早打ち I,1,1000,quick_hit_penalty,,"ヒット待ち-15% & 売却価格-10%",強化グループ,bolt
+quick_hit_penalty_2,早打ち II,2,3000,quick_hit_penalty,,"ヒット待ち-30% & 売却価格-20%",強化グループ,bolt
+quick_hit_penalty_3,早打ち III,3,8000,quick_hit_penalty,,"ヒット待ち-50% & 売却価格-40%",強化グループ,bolt
+quick_hit_penalty_4,早打ち 極,4,25000,quick_hit_penalty,,"ヒット待ち-75% & 売却価格-60%",強化グループ,bolt
+ultimate_risk_1,究極の賭け I,1,5000,ultimate_risk,0.4,"パワー+40% & 失敗時に所持魚が半分減少",強化グループ,bolt
+ultimate_risk_2,究極の賭け II,2,15000,ultimate_risk,0.7,"パワー+70% & 失敗時に所持魚が8割減少",強化グループ,bolt
+ultimate_risk_3,究極の賭け III,3,50000,ultimate_risk,1,"パワー+100% & 失敗時に所持魚が0になる",強化グループ,bolt
+ultimate_risk_4,究極の賭け 極,4,150000,ultimate_risk,2,"パワー+200% & 失敗時に所持金と魚が0になる",強化グループ,bolt
+high_risk_sell_1,闇取引 I,1,1200,high_risk_sell,,"売却価格1.2倍 & 失敗時に所持金微減",商売グループ,payments
+high_risk_sell_2,闇取引 II,2,5000,high_risk_sell,,"売却価格1.5倍 & 失敗時に所持金減少(小)",商売グループ,payments
+high_risk_sell_3,闇取引 III,3,15000,high_risk_sell,,"売却価格3倍 & 失敗時に所持金減少(大)",商売グループ,payments
+high_risk_sell_4,闇取引 極,4,50000,high_risk_sell,,"売却価格5倍 & 失敗時に全額没収",商売グループ,payments
+price_up_1,売値UP I,1,400,price_boost,0.1,"魚の売却価格+10%",商売グループ,payments
+price_up_2,売値UP II,2,1500,price_boost,0.25,"魚の売却価格+25%",商売グループ,payments
+price_up_3,売値UP III,3,4000,price_boost,0.45,"魚の売却価格+45%",商売グループ,payments
+price_up_4,売値UP 極,4,12000,price_boost,0.7,"魚の売却価格+70%",商売グループ,payments
+ship_fuel_discount_1,港の顔馴染み I,1,3000,ship_fuel_discount,0.15,"燃料購入価格 15%割引",商売グループ,payments
+ship_fuel_discount_2,港の顔馴染み II,2,10000,ship_fuel_discount,0.3,"燃料購入価格 30%割引",商売グループ,payments
+ship_fuel_discount_3,港の顔馴染み III,3,30000,ship_fuel_discount,0.5,"燃料購入価格 50%割引",商売グループ,payments
+ship_fuel_discount_4,港の顔馴染み 極,4,100000,ship_fuel_discount,0.8,"燃料購入価格 80%割引",商売グループ,payments
+shop_discount_1,ショップ割引 I,1,5000,shop_discount,0.1,"ショップのアイテム価格 -10%",商売グループ,payments
+shop_discount_2,ショップ割引 II,2,20000,shop_discount,0.2,"ショップのアイテム価格 -20%",商売グループ,payments
+shop_discount_3,ショップ割引 III,3,60000,shop_discount,0.3,"ショップのアイテム価格 -30%",商売グループ,payments
+shop_discount_4,ショップ割引 極,4,180000,shop_discount,0.5,"ショップのアイテム価格 -50%",商売グループ,payments
+upgrade_discount_1,強化割引 I,1,8000,upgrade_discount,0.1,"ロッド強化費用 -10%",商売グループ,payments
+upgrade_discount_2,強化割引 II,2,30000,upgrade_discount,0.2,"ロッド強化費用 -20%",商売グループ,payments
+upgrade_discount_3,強化割引 III,3,100000,upgrade_discount,0.3,"ロッド強化費用 -30%",商売グループ,payments
+upgrade_discount_4,強化割引 極,4,300000,upgrade_discount,0.5,"ロッド強化費用 -50%",商売グループ,payments
+amplifier_1,増幅の心得 I,1,5000,skill_amplifier,0.2,"他のスキル効果を1.2倍にする",技術グループ,precision_manufacturing
+amplifier_2,増幅の心得 II,2,15000,skill_amplifier,0.35,"他のスキル効果を1.35倍にする",技術グループ,precision_manufacturing
+amplifier_3,増幅の心得 III,3,40000,skill_amplifier,0.5,"他のスキル効果を1.5倍にする",技術グループ,precision_manufacturing
+amplifier_4,増幅の心得 極,4,150000,skill_amplifier,1,"他のスキル効果を2倍にする",技術グループ,precision_manufacturing
+auto_hit_1,自動合わせ I,1,2000,auto_hit,,"ウキ沈下時に15%で自動ヒット",技術グループ,precision_manufacturing
+auto_hit_2,自動合わせ II,2,8000,auto_hit,,"ウキ沈下時に30%で自動ヒット",技術グループ,precision_manufacturing
+auto_hit_3,自動合わせ III,3,25000,auto_hit,,"ウキ沈下時に50%で自動ヒット",技術グループ,precision_manufacturing
+auto_hit_4,自動合わせ 極,4,80000,auto_hit,,"ウキ沈下時に80%で自動ヒット",技術グループ,precision_manufacturing
+concentration_1,集中力 I,1,300,hit_window_mult,1.5,"HIT受付時間をベースの1.5倍に延長",技術グループ,precision_manufacturing
+concentration_2,集中力 II,2,1200,hit_window_mult,2,"HIT受付時間をベースの2倍に延長",技術グループ,precision_manufacturing
+concentration_3,集中力 III,3,5000,hit_window_mult,3,"HIT受付時間をベースの3倍に延長",技術グループ,precision_manufacturing
+concentration_4,集中力 極,4,20000,hit_window_mult,5,"HIT受付時間をベースの5倍に延長",技術グループ,precision_manufacturing
+nibble_fix_1,予兆察知 I,1,400,nibble_fix,3,"ウキの揺れが常に3回になる",技術グループ,precision_manufacturing
+nibble_fix_2,予兆察知 II,2,1200,nibble_fix,2,"ウキの揺れが常に2回になる",技術グループ,precision_manufacturing
+nibble_fix_3,予兆察知 III,3,4000,nibble_fix,1,"ウキの揺れが常に1回になる",技術グループ,precision_manufacturing
+nibble_fix_4,予兆察知 極,4,20000,nibble_fix,0,"即ヒット（ウキが揺れずに沈む）",技術グループ,precision_manufacturing
+perfect_master_1,達人の針 I,1,5000,perfect_catch,0.5,"ゲージ赤ゾーン停止時、捕獲率が50%になる",技術グループ,precision_manufacturing
+perfect_master_2,達人の針 II,2,20000,perfect_catch,0.75,"ゲージ赤ゾーン停止時、捕獲率が75%になる",技術グループ,precision_manufacturing
+perfect_master_3,達人の針 III,3,100000,perfect_catch,1,"ゲージ赤ゾーン停止時、捕獲率が100%になる",技術グループ,precision_manufacturing
+perfect_master_4,達人の針 極,4,250000,perfect_catch,1,"赤ゾーン停止時100%捕獲 & 赤ゾーン幅+40%",技術グループ,precision_manufacturing
+second_chance_1,起死回生 I,1,800,second_chance,0.1,"白ゾーンでの失敗時、10%で成功扱い",技術グループ,precision_manufacturing
+second_chance_2,起死回生 II,2,3000,second_chance,0.2,"白ゾーンでの失敗時、20%で成功扱い",技術グループ,precision_manufacturing
+second_chance_3,起死回生 III,3,8000,second_chance,0.35,"白ゾーンでの失敗時、35%で成功扱い",技術グループ,precision_manufacturing
+second_chance_4,起死回生 極,4,30000,second_chance,0.5,"白ゾーンでの失敗時、50%で成功扱い",技術グループ,precision_manufacturing
+technician_1,テクニシャン I,1,600,red_zone_boost,0.2,"赤ゾーンの幅が20%拡大",技術グループ,precision_manufacturing
+technician_2,テクニシャン II,2,2500,red_zone_boost,0.4,"赤ゾーンの幅が40%拡大",技術グループ,precision_manufacturing
+technician_3,テクニシャン III,3,7000,red_zone_boost,0.6,"赤ゾーンの幅が60%拡大",技術グループ,precision_manufacturing
+technician_4,テクニシャン 極,4,25000,red_zone_boost,1,"赤ゾーンの幅が100%拡大",技術グループ,precision_manufacturing
+catch_rate_1,キャッチ率UP I,1,500,catch_boost,0.05,"捕獲確率+5%",捕獲グループ,phishing
+catch_rate_2,キャッチ率UP II,2,2000,catch_boost,0.15,"捕獲確率+15%",捕獲グループ,phishing
+catch_rate_3,キャッチ率UP III,3,6000,catch_boost,0.3,"捕獲確率+30%",捕獲グループ,phishing
+catch_rate_4,キャッチ率UP 極,4,18000,catch_boost,0.5,"捕獲確率+50%",捕獲グループ,phishing
+dual_catcher_1,ダブルキャッチ I,1,3000,multi_catch_2,0.2,"20%の確率で魚が2匹釣れる",捕獲グループ,phishing
+dual_catcher_2,ダブルキャッチ II,2,10000,multi_catch_2,0.35,"35%の確率で魚が2匹釣れる",捕獲グループ,phishing
+dual_catcher_3,ダブルキャッチ III,3,30000,multi_catch_2,0.5,"50%の確率で魚が2匹釣れる",捕獲グループ,phishing
+dual_catcher_4,ダブルキャッチ 極,4,80000,multi_catch_2,0.8,"80%の確率で魚が2匹釣れる",捕獲グループ,phishing
+triple_catcher_1,トリプルキャッチ I,1,5000,multi_catch_3,0.05,"5%の確率で魚が3匹釣れる",捕獲グループ,phishing
+triple_catcher_2,トリプルキャッチ II,2,20000,multi_catch_3,0.1,"10%の確率で魚が3匹釣れる",捕獲グループ,phishing
+triple_catcher_3,トリプルキャッチ III,3,50000,multi_catch_3,0.2,"20%の確率で魚が3匹釣れる",捕獲グループ,phishing
+triple_catcher_4,トリプルキャッチ 極,4,120000,multi_catch_3,0.4,"40%の確率で魚が3匹釣れる",捕獲グループ,phishing
+appraisal_1,鑑定眼 I,1,1000,title_boost,2,"称号付きの出現確率が2倍",探索グループ,radar
+appraisal_2,鑑定眼 II,2,3500,title_boost,3,"称号付きの出現確率が3倍",探索グループ,radar
+appraisal_3,鑑定眼 III,3,9000,title_boost,4,"称号付きの出現確率が4倍",探索グループ,radar
+appraisal_4,鑑定眼 極,4,35000,title_boost,6,"称号付きの出現確率が6倍",探索グループ,radar
+big_game_hunter_1,大物狙い I,1,1200,big_game_boost,1.5,"上位ランクの出現率が1.5倍",探索グループ,radar
+big_game_hunter_2,大物狙い II,2,4500,big_game_boost,2.5,"上位ランクの出現率が2.5倍",探索グループ,radar
+big_game_hunter_3,大物狙い III,3,12000,big_game_boost,5,"上位ランクの出現率が5.0倍",探索グループ,radar
+big_game_hunter_4,大物狙い 極,4,45000,big_game_boost,10,"上位ランクの出現率が10倍",探索グループ,radar
+rank_collector_a,Aランク愛好家,3,20000,rank_collector,,"Aランクの魚が釣れやすくなる",探索グループ,radar
+rank_collector_b,Bランク愛好家,2,6000,rank_collector,,"Bランクの魚が釣れやすくなる",探索グループ,radar
+rank_collector_c,Cランク愛好家,1,2000,rank_collector,,"Cランクの魚が釣れやすくなる",探索グループ,radar
+rank_collector_s,Sランク愛好家,4,100000,rank_collector,,"Sランクの魚が釣れやすくなる",探索グループ,radar
+rank_license_a,Aランク免許,3,20000,rank_sniper,A,"Aランク以上の魚しか釣れなくなる",探索グループ,radar
+rank_license_b,Bランク免許,2,6000,rank_sniper,B,"Bランク以上の魚しか釣れなくなる",探索グループ,radar
+rank_license_c,Cランク免許,1,2000,rank_sniper,C,"Cランク以上の魚しか釣れなくなる",探索グループ,radar
+rank_license_s,Sランク免許,4,100000,rank_sniper,S,"Sランク以上の魚しか釣れなくなる",探索グループ,radar
+rare_up_1,レア魚UP I,1,600,rare_boost,0.2,"レア魚出現率+20%",探索グループ,radar
+rare_up_2,レア魚UP II,2,2400,rare_boost,0.5,"レア魚出現率+50%",探索グループ,radar
+rare_up_3,レア魚UP III,3,10000,rare_boost,1,"レア魚出現率+100%",探索グループ,radar
+rare_up_4,レア魚UP 極,4,40000,rare_boost,3,"レア魚出現率が3倍",探索グループ,radar
+bird_watcher_1,バードウォッチャー I,1,2000,bird_event_boost,0.05,"鳥イベント出現率 +5%",宝物グループ,card_giftcard
+bird_watcher_2,バードウォッチャー II,2,8000,bird_event_boost,0.1,"鳥イベント出現率 +10%",宝物グループ,card_giftcard
+bird_watcher_3,バードウォッチャー III,3,25000,bird_event_boost,0.15,"鳥イベント出現率 +15%",宝物グループ,card_giftcard
+bird_watcher_4,バードウォッチャー 極,4,80000,bird_event_boost,0.3,"鳥イベント出現率 +30%",宝物グループ,card_giftcard
+fortune_hunter_1,フォーチュンハンター I,1,3000,treasure_quantity,0.2,"宝箱報酬量 +20%",宝物グループ,card_giftcard
+fortune_hunter_2,フォーチュンハンター II,2,10000,treasure_quantity,0.5,"宝箱報酬量 +50%",宝物グループ,card_giftcard
+fortune_hunter_3,フォーチュンハンター III,3,30000,treasure_quantity,1,"宝箱報酬量 +100%",宝物グループ,card_giftcard
+fortune_hunter_4,フォーチュンハンター 極,4,80000,treasure_quantity,2,"宝箱報酬量 +200%",宝物グループ,card_giftcard
+luxury_hunter_1,ラグジュアリーハンター I,1,5000,treasure_quality,1.2,"宝箱報酬質UP(小)",宝物グループ,card_giftcard
+luxury_hunter_2,ラグジュアリーハンター II,2,20000,treasure_quality,1.5,"宝箱報酬質UP(中)",宝物グループ,card_giftcard
+luxury_hunter_3,ラグジュアリーハンター III,3,50000,treasure_quality,2,"宝箱報酬質UP(大)",宝物グループ,card_giftcard
+luxury_hunter_4,ラグジュアリーハンター 極,4,150000,treasure_quality,3,"宝箱報酬質UP(特大)",宝物グループ,card_giftcard
+sailor_intuition_1,船乗りの勘 I,1,2000,boat_event_boost,0.05,"ボートイベント出現率 +5%",宝物グループ,card_giftcard
+sailor_intuition_2,船乗りの勘 II,2,8000,boat_event_boost,0.1,"ボートイベント出現率 +10%",宝物グループ,card_giftcard
+sailor_intuition_3,船乗りの勘 III,3,25000,boat_event_boost,0.15,"ボートイベント出現率 +15%",宝物グループ,card_giftcard
+sailor_intuition_4,船乗りの勘 極,4,80000,boat_event_boost,0.3,"ボートイベント出現率 +30%",宝物グループ,card_giftcard
+treasure_hunter_1,トレジャーハンター I,1,1500,treasure_boost,0.02,"宝箱出現率 +2%",宝物グループ,card_giftcard
+treasure_hunter_2,トレジャーハンター II,2,5000,treasure_boost,0.05,"宝箱出現率 +5%",宝物グループ,card_giftcard
+treasure_hunter_3,トレジャーハンター III,3,15000,treasure_boost,0.1,"宝箱出現率 +10%",宝物グループ,card_giftcard
+treasure_hunter_4,トレジャーハンター 極,4,50000,treasure_boost,0.2,"宝箱出現率 +20%",宝物グループ,card_giftcard
+fever_bias_moon_1,月の加護 I,1,5000,fever_bias_moon,0.1,"おさかなフィーバー確率 +10%",特殊効果グループ,auto_awesome
+fever_bias_moon_2,月の加護 II,2,15000,fever_bias_moon,0.2,"おさかなフィーバー確率 +20%",特殊効果グループ,auto_awesome
+fever_bias_moon_3,月の加護 III,3,50000,fever_bias_moon,0.35,"おさかなフィーバー確率 +35%",特殊効果グループ,auto_awesome
+fever_bias_moon_4,月の加護 極,4,150000,fever_bias_moon,0.6,"おさかなフィーバー確率 +60%",特殊効果グループ,auto_awesome
+fever_bias_sun_1,太陽の加護 I,1,5000,fever_bias_sun,0.1,"おたからフィーバー確率 +10%",特殊効果グループ,auto_awesome
+fever_bias_sun_2,太陽の加護 II,2,15000,fever_bias_sun,0.2,"おたからフィーバー確率 +20%",特殊効果グループ,auto_awesome
+fever_bias_sun_3,太陽の加護 III,3,50000,fever_bias_sun,0.35,"おたからフィーバー確率 +35%",特殊効果グループ,auto_awesome
+fever_bias_sun_4,太陽の加護 極,4,150000,fever_bias_sun,0.6,"おたからフィーバー確率 +60%",特殊効果グループ,auto_awesome
+fever_treasure_boost_1,フィーバーリッチ I,1,2000,fever_treasure_boost,0.1,"フィーバー中の宝箱出現率 +10%",特殊効果グループ,auto_awesome
+fever_treasure_boost_2,フィーバーリッチ II,2,8000,fever_treasure_boost,0.2,"フィーバー中の宝箱出現率 +20%",特殊効果グループ,auto_awesome
+fever_treasure_boost_3,フィーバーリッチ III,3,25000,fever_treasure_boost,0.35,"フィーバー中の宝箱出現率 +35%",特殊効果グループ,auto_awesome
+fever_treasure_boost_4,フィーバーリッチ 極,4,70000,fever_treasure_boost,0.6,"フィーバー中の宝箱出現率 +60%",特殊効果グループ,auto_awesome
+mania_1,熱狂 I,1,3000,fever_long,0.1,"フィーバー終了確率 -10%",特殊効果グループ,auto_awesome
+mania_2,熱狂 II,2,12000,fever_long,0.2,"フィーバー終了確率 -20%",特殊効果グループ,auto_awesome
+mania_3,熱狂 III,3,40000,fever_long,0.3,"フィーバー終了確率 -30%",特殊効果グループ,auto_awesome
+mania_4,熱狂 極,4,100000,fever_long,0.5,"フィーバー終了確率 -50%",特殊効果グループ,auto_awesome
+moon_rare_up_1,月光の導き I,1,3000,moon_rare_up,0.2,"月の加護装備時のみレア魚率+20%",特殊効果グループ,auto_awesome
+moon_rare_up_2,月光の導き II,2,10000,moon_rare_up,0.4,"月の加護装備時のみレア魚率+40%",特殊効果グループ,auto_awesome
+moon_rare_up_3,月光の導き III,3,40000,moon_rare_up,0.7,"月の加護装備時のみレア魚率+70%",特殊効果グループ,auto_awesome
+moon_rare_up_4,月光の導き 極,4,120000,moon_rare_up,2,"月の加護装備時のみレア魚出現率が2倍",特殊効果グループ,auto_awesome
+passion_1,情熱 I,1,2000,fever_charge,0.05,"フィーバーゲージ蓄積率 +5%",特殊効果グループ,auto_awesome
+passion_2,情熱 II,2,8000,fever_charge,0.1,"フィーバーゲージ蓄積率 +10%",特殊効果グループ,auto_awesome
+passion_3,情熱 III,3,25000,fever_charge,0.15,"フィーバーゲージ蓄積率 +15%",特殊効果グループ,auto_awesome
+passion_4,情熱 極,4,60000,fever_charge,0.25,"フィーバーゲージ蓄積率 +25%",特殊効果グループ,auto_awesome
+sun_chest_up_1,太陽の恵み I,1,3000,sun_chest_up,0.05,"太陽の加護装備時のみ宝箱率+5%",特殊効果グループ,auto_awesome
+sun_chest_up_2,太陽の恵み II,2,10000,sun_chest_up,0.15,"太陽の加護装備時のみ宝箱率+15%",特殊効果グループ,auto_awesome
+sun_chest_up_3,太陽の恵み III,3,40000,sun_chest_up,0.4,"太陽の加護装備時のみ宝箱率+40%",特殊効果グループ,auto_awesome
+sun_chest_up_4,太陽の恵み 極,4,120000,sun_chest_up,3,"太陽の加護装備時のみ宝箱出現率が3倍",特殊効果グループ,auto_awesome
+casual_fisher_1,カジュアル I,1,1000,log_coin_boost,0.2,"放置コイン獲得率 +20%",成長グループ,trending_up
+casual_fisher_2,カジュアル II,2,4000,log_coin_boost,0.5,"放置コイン獲得率 +50%",成長グループ,trending_up
+casual_fisher_3,カジュアル III,3,12000,log_coin_boost,1,"放置コイン獲得率 +100%",成長グループ,trending_up
+casual_fisher_4,カジュアル 極,4,40000,log_coin_boost,2,"放置コイン獲得率 +200%",成長グループ,trending_up
+gacha_mission_up_1,ガチャの使命 I,1,4000,gacha_mission_boost,0.2,"報酬がガチャチケのミッション率 +20%",成長グループ,trending_up
+gacha_mission_up_2,ガチャの使命 II,2,15000,gacha_mission_boost,0.5,"報酬がガチャチケのミッション率 +50%",成長グループ,trending_up
+gacha_mission_up_3,ガチャの使命 III,3,40000,gacha_mission_boost,1,"報酬がガチャチケのミッション率 +100%",成長グループ,trending_up
+gacha_mission_up_4,ガチャの使命 極,4,120000,gacha_mission_boost,2,"報酬がガチャチケのミッション率 +200%",成長グループ,trending_up
+mission_reward_up_1,報酬アップ I,1,800,mission_reward_up,0.5,"ミッション報酬 +50%",成長グループ,trending_up
+mission_reward_up_2,報酬アップ II,2,4000,mission_reward_up,1,"ミッション報酬 +100%",成長グループ,trending_up
+mission_reward_up_3,報酬アップ III,3,15000,mission_reward_up,2,"ミッション報酬 +200%",成長グループ,trending_up
+mission_reward_up_4,報酬アップ 極,4,50000,mission_reward_up,4,"ミッション報酬 +400% (5倍)",成長グループ,trending_up
+rank_power_boost_1,ランク熟練 I,1,5000,rank_power_boost,0.5,"ランクによるパワーボーナス +50%",成長グループ,trending_up
+rank_power_boost_2,ランク熟練 II,2,15000,rank_power_boost,1,"ランクによるパワーボーナス +100%",成長グループ,trending_up
+rank_power_boost_3,ランク熟練 III,3,50000,rank_power_boost,2,"ランクによるパワーボーナス +200%",成長グループ,trending_up
+rank_power_boost_4,ランク熟練 極,4,150000,rank_power_boost,4,"ランクによるパワーボーナス +400%",成長グループ,trending_up
+rank_reward_boost_1,栄光の報酬 I,1,20000,rank_reward_boost,5,"ランクアップ報酬 5倍",成長グループ,trending_up
+rank_reward_boost_2,栄光の報酬 II,2,80000,rank_reward_boost,10,"ランクアップ報酬 10倍",成長グループ,trending_up
+rank_reward_boost_3,栄光の報酬 III,3,250000,rank_reward_boost,20,"ランクアップ報酬 20倍",成長グループ,trending_up
+rank_reward_boost_4,栄光の報酬 極,4,1000000,rank_reward_boost,50,"ランクアップ報酬 50倍",成長グループ,trending_up
+stoic_1,ストイック I,1,1500,stoic,,"獲得経験値 +20% & コイン -10%",成長グループ,trending_up
+stoic_2,ストイック II,2,6000,stoic,,"獲得経験値 +50% & コイン -20%",成長グループ,trending_up
+stoic_3,ストイック III,3,20000,stoic,,"獲得経験値 +100% & コイン -40%",成長グループ,trending_up
+stoic_4,ストイック 極,4,60000,stoic,,"獲得経験値 +200% & コイン -60%",成長グループ,trending_up
+xp_boost_1,経験値アップ I,1,2000,xp_boost,0.1,"獲得経験値 +10%",成長グループ,trending_up
+xp_boost_2,経験値アップ II,2,8000,xp_boost,0.2,"獲得経験値 +20%",成長グループ,trending_up
+xp_boost_3,経験値アップ III,3,25000,xp_boost,0.5,"獲得経験値 +50%",成長グループ,trending_up
+xp_boost_4,経験値アップ 極,4,80000,xp_boost,1,"獲得経験値 +100%",成長グループ,trending_up
+bait_master_1,餌の達人 I,1,500,bait_save,0.15,"釣り成功時、15%で餌を消費しない",便利グループ,build
+bait_master_2,餌の達人 II,2,2000,bait_save,0.3,"釣り成功時、30%で餌を消費しない",便利グループ,build
+bait_master_3,餌の達人 III,3,6000,bait_save,0.5,"釣り成功時、50%で餌を消費しない",便利グループ,build
+bait_master_4,餌の達人 極,4,25000,bait_save,0.75,"釣り成功時、75%で餌を消費しない",便利グループ,build
+recycle_boost_1,リサイクル強化 I,1,2000,recycle_boost,,"リサイクルの必要スキル数 -1",便利グループ,build
+recycle_boost_2,リサイクル強化 II,2,8000,recycle_boost,,"リサイクルの必要スキル数 -2",便利グループ,build
+recycle_boost_3,リサイクル強化 III,3,25000,recycle_boost,,"リサイクル時の獲得スキル数 +1",便利グループ,build
+recycle_boost_4,リサイクル強化 極,4,80000,recycle_boost,,"リサイクル必要数-3 & 獲得数+2",便利グループ,build
+ship_amount_up_1,大型網 I,1,6000,ship_amount_up,1-2,"一度の漁獲量 +1〜2匹",便利グループ,build
+ship_amount_up_2,大型網 II,2,25000,ship_amount_up,3-5,"一度の漁獲量 +3〜5匹",便利グループ,build
+ship_amount_up_3,大型網 III,3,80000,ship_amount_up,6-10,"一度の漁獲量 +6〜10匹",便利グループ,build
+ship_amount_up_4,大型網 極,4,250000,ship_amount_up,15-25,"一度の漁獲量 +15〜25匹",便利グループ,build
+ship_fuel_eco_1,エコ航行 I,1,4000,ship_fuel_eco,0.2,"20%の確率で燃料消費を回避",便利グループ,build
+ship_fuel_eco_2,エコ航行 II,2,15000,ship_fuel_eco,0.4,"40%の確率で燃料消費を回避",便利グループ,build
+ship_fuel_eco_3,エコ航行 III,3,45000,ship_fuel_eco,0.6,"60%の確率で燃料消費を回避",便利グループ,build
+ship_fuel_eco_4,エコ航行 極,4,150000,ship_fuel_eco,0.9,"90%の確率で燃料消費を回避",便利グループ,build
+ship_interval_down_1,高速エンジン I,1,5000,ship_interval_down,0.1,"漁獲間隔を10%短縮",便利グループ,build
+ship_interval_down_2,高速エンジン II,2,20000,ship_interval_down,0.25,"漁獲間隔を25%短縮",便利グループ,build
+ship_interval_down_3,高速エンジン III,3,60000,ship_interval_down,0.45,"漁獲間隔を45%短縮",便利グループ,build
+ship_interval_down_4,高速エンジン 極,4,180000,ship_interval_down,0.7,"漁獲間隔を70%短縮",便利グループ,build
+slot_expansion_1,拡張モジュール I,1,5000,skill_slot_expansion,1,"スキルスロット数 +1",便利グループ,build
+slot_expansion_2,拡張モジュール II,2,20000,skill_slot_expansion,2,"スキルスロット数 +2",便利グループ,build
+slot_expansion_3,拡張モジュール III,3,50000,skill_slot_expansion,3,"スキルスロット数 +3",便利グループ,build
+slot_expansion_4,拡張モジュール 極,4,120000,skill_slot_expansion,5,"スキルスロット数 +5",便利グループ,build
+count_fish_gacha_2,魚の知識 II,2,15000,count_fish_gacha,0.05,"所持魚10個につき追加ガチャチケ +0.5",収集ボーナス,inventory_2
+count_fish_gacha_3,魚の知識 III,3,40000,count_fish_gacha,0.1,"所持魚10個につき追加ガチャチケ +1.0",収集ボーナス,inventory_2
+count_fish_gacha_4,魚の知識 極,4,120000,count_fish_gacha,0.2,"所持魚10個につき追加ガチャチケ +2.0",収集ボーナス,inventory_2
+count_fish_title_1,称号への関心 I,1,4000,count_fish_title,0.0005,"所持魚10個につき称号率 +0.5%",収集ボーナス,inventory_2
+count_fish_title_2,称号への関心 II,2,15000,count_fish_title,0.0015,"所持魚10個につき称号率 +1.5%",収集ボーナス,inventory_2
+count_fish_title_3,称号への関心 III,3,40000,count_fish_title,0.003,"所持魚10個につき称号率 +3.0%",収集ボーナス,inventory_2
+count_fish_title_4,称号への関心 極,4,120000,count_fish_title,0.006,"所持魚10個につき称号率 +6.0%",収集ボーナス,inventory_2
+count_gacha_coin_1,チケットの重み I,1,4000,count_gacha_coin,0.01,"所持チケット10枚につき追加コイン +10%",収集ボーナス,inventory_2
+count_gacha_coin_2,チケットの重み II,2,15000,count_gacha_coin,0.025,"所持チケット10枚につき追加コイン +25%",収集ボーナス,inventory_2
+count_gacha_coin_3,チケットの重み III,3,40000,count_gacha_coin,0.05,"所持チケット10枚につき追加コイン +50%",収集ボーナス,inventory_2
+count_gacha_coin_4,チケットの重み 極,4,120000,count_gacha_coin,0.1,"所持チケット10枚につき追加コイン +100%",収集ボーナス,inventory_2
+count_gacha_sell_1,券の価値 I,1,3000,count_gacha_sell,0.05,"所持ガチャチケ数に応じて売却価格UP(小)",収集ボーナス,inventory_2
+count_gacha_sell_2,券の価値 II,2,12000,count_gacha_sell,0.1,"所持ガチャチケ数に応じて売却価格UP(中)",収集ボーナス,inventory_2
+count_gacha_sell_3,券の価値 III,3,40000,count_gacha_sell,0.2,"所持ガチャチケ数に応じて売却価格UP(大)",収集ボーナス,inventory_2
+count_gacha_sell_4,券の価値 極,4,60000,count_gacha_sell,0.35,"所持ガチャチケ数に応じて売却価格UP(超)",収集ボーナス,inventory_2
+count_skill_power_1,マナの共鳴 I,1,3000,count_skill_power,0.5,"所持スキル数に応じてパワーUP(小)",収集ボーナス,inventory_2
+count_skill_power_2,マナの共鳴 II,2,12000,count_skill_power,1,"所持スキル数に応じてパワーUP(中)",収集ボーナス,inventory_2
+count_skill_power_3,マナの共鳴 III,3,40000,count_skill_power,2,"所持スキル数に応じてパワーUP(大)",収集ボーナス,inventory_2
+count_skill_power_4,マナの共鳴 極,4,60000,count_skill_power,3.5,"所持スキル数に応じてパワーUP(超)",収集ボーナス,inventory_2
