@@ -953,15 +953,37 @@ const FUELS = [
 const ROGUE_CONFIG = {
     // --- ラウンド ---
     finalRound: 10,                 // このラウンドをクリアすると航海達成（以降はエンドレス）
-    targets: [100, 220, 450, 900, 1600, 2800, 4800, 8000, 13000, 20000], // 各ラウンドの目標水揚げ額(G)
-    endlessGrowth: 1.8,             // 最終ラウンド以降の目標の伸び率
-    baitPerRound: 10,               // 毎ラウンド支給される基本の餌(bait_d)の数
+    targets: [100, 300, 800, 2000, 4500, 8500, 14000, 20000, 27000, 36000], // 各ラウンドの目標水揚げ額(G)
+    endlessGrowth: 1.3,             // 最終ラウンド以降の目標の伸び率
+    baitPerRound: 10,               // 毎ラウンド支給される餌の数
+    // 支給される餌のランク（from 以降のラウンドで適用。後ろの定義が優先）
+    supplyBait: [
+        { from: 1, id: 'bait_d' },
+        { from: 4, id: 'bait_c' },
+        { from: 7, id: 'bait_b' },
+        { from: 10, id: 'bait_a' }
+    ],
+
+    // --- 評価（目標達成後も「帰港」を押すまで釣りを続けられる） ---
+    grades: [
+        { id: 'gold', name: '金', rate: 2.0, rewardChoices: 4, tierUp: true, freeRerolls: 1 },
+        { id: 'silver', name: '銀', rate: 1.5, rewardChoices: 4, tierUp: false, freeRerolls: 0 },
+        { id: 'bronze', name: '銅', rate: 1.0, rewardChoices: 3, tierUp: false, freeRerolls: 0 }
+    ],
 
     // --- ラウンドクリア報酬 ---
-    clearBonusRate: 0.25,           // 目標額に対するクリアボーナスの割合
-    leftoverBaitBonus: 10,          // 余った基本の餌1個あたりのボーナス(G) × ラウンド数
-    rewardChoices: 3,               // 報酬スキルの選択肢の数
+    clearBonusRate: 0.20,           // 目標額に対するクリアボーナスの割合
+    leftoverBaitBonus: 10,          // 余った支給餌1個あたりのボーナス(G) × ラウンド数
     rewardSkipRate: 0.15,           // 報酬スキルを受け取らない場合にもらえる額（目標額に対する割合）
+
+    // --- 連続成功コンボ ---
+    combo: { step: 0.1, maxStacks: 5 },  // 1連続ごとに売値+10%、最大+50%
+
+    // --- 釣り上げ判定 ---
+    redZoneFloor: 0.6,              // 赤ゾーンの捕獲率の下限（緑ゾーンの平均+10ポイント）
+
+    // --- 宝箱のお金（目標額に対する割合。最小〜最大） ---
+    treasureMoneyRate: { WOOD: [0.10, 0.20], SILVER: [0.25, 0.40], GOLD: [0.60, 1.00] },
 
     // --- スキル ---
     baseSkillSlots: 2,
@@ -969,8 +991,9 @@ const ROGUE_CONFIG = {
     skillPrices: { 1: 120, 2: 450, 3: 1500, 4: 5000, 0: 12000 }, // Tier別の店売り価格 (0 = 特別スキル)
     skillSellRate: 0.4,             // 売却時に戻る割合
     shopSkillCount: 3,              // 港に並ぶスキルの数
-    rerollBaseRate: 0.05,           // 入れ替え費用（次ラウンド目標に対する割合）
+    rerollBaseRate: 0.03,           // 入れ替え費用（次ラウンド目標に対する割合）
     rerollGrowth: 1.5,              // 同じ港で入れ替えるたびの費用倍率
+    caps: { baitSave: 0.4, multiCatch2: 0.5, multiCatch3: 0.2 },
 
     // ラウンドごとのTier出現重み（from 以降のラウンドで適用。後ろの定義が優先）
     tierWeights: [
@@ -984,28 +1007,96 @@ const ROGUE_CONFIG = {
     // ローグライト版では機能しない／バランスを壊すため出現させない効果
     excludedEffects: [
         'ultimate_risk', 'rank_sniper', 'rank_sniper_fixed', 'hard_mode', 'good_feel',
-        'infinite_bait', 'mobile_shop', 'perpetual_engine',
+        'infinite_bait', 'mobile_shop', 'perpetual_engine', 'skill_amplifier',
         'ship_interval_down', 'ship_amount_up', 'ship_fuel_eco', 'ship_fuel_discount',
         'stoic', 'xp_boost', 'rank_power_boost', 'rank_reward_boost', 'log_coin_boost',
         'mission_reward_up', 'gacha_mission_boost', 'recycle_boost',
         'count_fish_gacha', 'count_gacha_coin', 'count_fish_title', 'count_gacha_sell'
     ],
 
+    // 予算（設計書 6.7）を超えるスキルの調整。読み込み時に SKILLS へ上書きする
+    skillOverrides: {
+        high_risk_sell_1: { description: '売却価格1.15倍 & 失敗時にそのラウンドの水揚げ-5%', effect: { type: 'high_risk_sell', priceMult: 1.15, penaltyRate: 0.05 } },
+        high_risk_sell_2: { description: '売却価格1.3倍 & 失敗時にそのラウンドの水揚げ-10%', effect: { type: 'high_risk_sell', priceMult: 1.3, penaltyRate: 0.1 } },
+        high_risk_sell_3: { description: '売却価格1.6倍 & 失敗時にそのラウンドの水揚げ-15%', effect: { type: 'high_risk_sell', priceMult: 1.6, penaltyRate: 0.15 } },
+        high_risk_sell_4: { description: '売却価格2倍 & 失敗時にそのラウンドの水揚げ-20%', effect: { type: 'high_risk_sell', priceMult: 2, penaltyRate: 0.2 } },
+        bait_master_1: { description: '釣り成功時、10%で餌を消費しない', effect: { type: 'bait_save', value: 0.1 } },
+        bait_master_2: { description: '釣り成功時、20%で餌を消費しない', effect: { type: 'bait_save', value: 0.2 } },
+        bait_master_3: { description: '釣り成功時、30%で餌を消費しない', effect: { type: 'bait_save', value: 0.3 } },
+        bait_master_4: { description: '釣り成功時、40%で餌を消費しない', effect: { type: 'bait_save', value: 0.4 } },
+        dual_catcher_1: { description: '15%の確率で魚が2匹釣れる', effect: { type: 'multi_catch_2', value: 0.15 } },
+        dual_catcher_2: { description: '25%の確率で魚が2匹釣れる', effect: { type: 'multi_catch_2', value: 0.25 } },
+        dual_catcher_3: { description: '35%の確率で魚が2匹釣れる', effect: { type: 'multi_catch_2', value: 0.35 } },
+        dual_catcher_4: { description: '50%の確率で魚が2匹釣れる', effect: { type: 'multi_catch_2', value: 0.5 } },
+        triple_catcher_2: { description: '8%の確率で魚が3匹釣れる', effect: { type: 'multi_catch_3', value: 0.08 } },
+        triple_catcher_3: { description: '12%の確率で魚が3匹釣れる', effect: { type: 'multi_catch_3', value: 0.12 } },
+        triple_catcher_4: { description: '20%の確率で魚が3匹釣れる', effect: { type: 'multi_catch_3', value: 0.2 } },
+        price_up_4: { description: '魚の売却価格+50%', effect: { type: 'price_boost', value: 0.5 } }
+    },
+
     // --- 港で買える餌（1回の寄港ごとの在庫つき） ---
     baitShop: [
         { id: 'bait_c', quantity: 3, price: 45, stock: 3, fromRound: 1 },
         { id: 'bait_b', quantity: 3, price: 180, stock: 3, fromRound: 2 },
-        { id: 'bait_a', quantity: 3, price: 700, stock: 3, fromRound: 4 },
-        { id: 'bait_s', quantity: 2, price: 2400, stock: 3, fromRound: 6 }
+        { id: 'bait_a', quantity: 3, price: 500, stock: 3, fromRound: 4 },
+        { id: 'bait_s', quantity: 3, price: 1200, stock: 3, fromRound: 6 }
     ],
 
-    // --- 竿（原作の価格に掛ける倍率） ---
-    costMult: { rod: 0.4, upgrade: 0.4 },
+    // --- 竿（ローグライト版の価格表。原作の RODS.price / upgradeCosts は使わない） ---
+    rodPrices: [0, 500, 2000, 6000, 18000],
+    rodUpgradeCosts: [
+        [40, 80, 120, 180, 260],
+        [150, 250, 350, 500, 700],
+        [500, 800, 1100, 1500, 2000],
+        [1500, 2200, 3000, 4000, 5500],
+        [4000, 6000, 8000, 11000, 15000]
+    ],
 
-    // ラウンドごとの空（見た目のみ）
+    // ラウンドごとの空（海域に空の指定がないときに使う）
     skyByRound: ['sky_default', 'sky_default', 'sky_sunset', 'sky_sunset', 'sky_night', 'sky_night',
-        'sky_cherry', 'sky_storm', 'sky_aurora', 'sky_galaxy']
+        'sky_cherry', 'sky_storm', 'sky_aurora', 'sky_galaxy'],
+
+    // --- 海域（港で2つ提示され、選んだ方へ出航する） ---
+    // effects はその海域にいる間だけ装備される見えないスキルとして扱う
+    areaChoices: 2,
+    areas: [
+        {
+            id: 'calm', name: '穏やかな湾', icon: 'beach_access', sky: 'sky_default', targetMult: 0.8,
+            description: 'ゲージが遅い。報酬スキルの選択肢が1つ減る',
+            effects: [{ type: 'gauge_slow', value: 0.2 }], rewardChoicesDelta: -1
+        },
+        {
+            id: 'offshore', name: '沖合', icon: 'sailing', sky: null, targetMult: 1.0,
+            description: '特別な効果はない', effects: []
+        },
+        {
+            id: 'storm', name: '嵐の海', icon: 'thunderstorm', sky: 'sky_storm', targetMult: 1.2,
+            description: 'ゲージが速い。魚の売値+30%',
+            effects: [{ type: 'gauge_slow', value: -0.25 }, { type: 'price_boost', value: 0.3 }]
+        },
+        {
+            id: 'cove', name: '宝の入り江', icon: 'diamond', sky: 'sky_sunset', targetMult: 1.0,
+            description: '宝箱の出現率+15%。魚の売値-30%',
+            effects: [{ type: 'treasure_boost', value: 0.15 }, { type: 'price_boost', value: -0.3 }]
+        },
+        {
+            id: 'moon', name: '月夜の海', icon: 'nightlight', sky: 'sky_night', targetMult: 1.1,
+            description: '月のフィーバーゲージが4から始まる。待ち時間+30%',
+            effects: [{ type: 'wait_time_reduction', value: -0.3 }], startFever: { type: 'moon', value: 4 }
+        },
+        {
+            id: 'school', name: '群れの潮', icon: 'waves', sky: 'sky_cherry', targetMult: 1.0,
+            description: '2匹釣りの確率+30%。餌より上のランクが出ない',
+            effects: [{ type: 'multi_catch_2', value: 0.3 }], noUpperRank: true
+        }
+    ]
 };
+
+// 調整したスキルを上書きする
+Object.entries(ROGUE_CONFIG.skillOverrides).forEach(([id, patch]) => {
+    const skill = SKILLS.find(s => s.id === id);
+    if (skill) Object.assign(skill, patch);
+});
 
 // エクスポート用（グローバル変数として使用）
 if (typeof window !== 'undefined') {

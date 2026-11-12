@@ -22,10 +22,15 @@ const RunManager = {
             earned: 0,
             phase: 'harbor',   // 'fishing' | 'harbor' | 'over'
             harbor: null,      // 港にいる間だけ持つ状態（報酬候補・品揃えなど）
+            area: 'offshore',  // 今いる海域
+            reached: false,    // このラウンドの目標を達成したか（達成後は「帰港」で港へ）
+            combo: 0,          // 連続成功数
+            supply: null,      // このラウンドに支給された餌 { id, count }
+            stats: { casts: 0, catches: 0, escapes: 0, escapedPower: 0, zones: { red: 0, green: 0, white: 0 } },
             previousBest: SaveManager.loadMeta().bestRound // 航海開始時点の最高記録
         };
         SaveManager.recordRun(0, true);
-        this.startNextRound();
+        this.startNextRound('offshore');
     },
 
     // 中断した航海を再開する。再開できなければ false
@@ -48,68 +53,135 @@ const RunManager = {
     // ========================================
     // ラウンド
     // ========================================
-    getTarget(round) {
+    getTarget(round, areaId = null) {
         const targets = this.config.targets;
-        if (round <= targets.length) return targets[round - 1];
+        let raw;
+        if (round <= targets.length) {
+            raw = targets[round - 1];
+        } else {
+            // 最終ラウンド以降（エンドレス）は一定倍率で伸ばす
+            raw = targets[targets.length - 1] * Math.pow(this.config.endlessGrowth, round - targets.length);
+        }
 
-        // 最終ラウンド以降（エンドレス）は一定倍率で伸ばし、キリのいい数字に丸める
-        const raw = targets[targets.length - 1] * Math.pow(this.config.endlessGrowth, round - targets.length);
-        return Math.round(raw / 1000) * 1000;
+        const area = areaId ? this.getArea(areaId) : null;
+        if (area) raw *= area.targetMult;
+
+        // キリのいい数字に丸める（1,000未満は10G単位、それ以上は100G単位）
+        const unit = raw < 1000 ? 10 : 100;
+        return Math.round(raw / unit) * unit;
     },
 
+    getArea(areaId) {
+        return this.config.areas.find(a => a.id === areaId) || null;
+    },
+
+    // そのラウンドで支給される餌のID
+    getSupplyBait(round) {
+        let id = this.config.supplyBait[0].id;
+        this.config.supplyBait.forEach(entry => {
+            if (round >= entry.from) id = entry.id;
+        });
+        return id;
+    },
     canFish() {
         return !!this.run && this.run.phase === 'fishing';
     },
 
     // 次のラウンドへ出航する
-    startNextRound() {
+    startNextRound(areaId = 'offshore') {
         const run = this.run;
+        const area = this.getArea(areaId) || this.getArea('offshore');
         run.round++;
-        run.target = this.getTarget(run.round);
+        run.area = area.id;
+        run.target = this.getTarget(run.round, area.id);
         run.earned = 0;
+        run.reached = false;
+        run.combo = 0;
         run.phase = 'fishing';
         run.harbor = null;
 
-        // 基本の餌を支給（買った餌は持ち越し）
-        GameState.addBait('bait_d', this.config.baitPerRound);
+        // 餌を支給（買った餌は持ち越し）。支給分は余るとクリア時にボーナスへ換金される
+        const supplyId = this.getSupplyBait(run.round);
+        // carried = 前のラウンドから持ち越した同じ餌の数（クリア時の換金で買った餌を減らさないため）
+        run.supply = { id: supplyId, count: this.config.baitPerRound, carried: GameState.getBaitCount(supplyId) };
+        GameState.addBait(supplyId, this.config.baitPerRound);
+        GameState.baitType = supplyId;
         GameState.ensureUsableBait();
 
-        // ラウンドごとに空の見た目を変える
+        // 海域「月夜の海」: 月のフィーバーゲージを途中から始める
+        if (area.startFever && !GameState.fever.isActive) {
+            GameState.fever.type = area.startFever.type;
+            GameState.fever.value = Math.max(GameState.fever.value, area.startFever.value);
+        }
+
+        // 空の見た目: 海域の空、なければラウンドごとの空
         const skies = this.config.skyByRound;
-        GameState.selectedSky = skies[(run.round - 1) % skies.length];
+        GameState.selectedSky = area.sky || skies[(run.round - 1) % skies.length];
 
         FishingGame.init();
         SaveManager.save();
         UIManager.showScreen('fishing');
         UIManager.updateFeverVisuals();
-        UIManager.showNotification(`ROUND ${run.round}`, `目標 ${run.target.toLocaleString()} G ／ 餌 ${GameState.getTotalBaitCount()}個`, 'sailing', 3000);
+        const bait = GAME_DATA.BAITS.find(b => b.id === supplyId);
+        UIManager.showNotification(`ROUND ${run.round} ・ ${area.name}`,
+            `目標 ${run.target.toLocaleString()} G ／ ${bait.name}×${this.config.baitPerRound} 支給`, area.icon, 3000);
     },
-
     // 一投ごとに呼ばれる決着判定。ラウンドが終わったら true
     checkRoundEnd() {
         const run = this.run;
         if (!run || run.phase !== 'fishing') return true;
 
-        if (run.earned >= run.target) {
-            this.clearRound();
-            return true;
+        // 目標達成: すぐには終わらず「帰港」を押すまで粘れる
+        if (!run.reached && run.earned >= run.target) {
+            run.reached = true;
+            SaveManager.save();
+            UIManager.updateStatus();
+            UIManager.showNotification('目標達成！',
+                `いつでも帰港できます。${this.gradeHint()}`, 'flag', 3500);
         }
+
         if (GameState.getTotalBaitCount() <= 0) {
-            this.gameOver();
+            if (run.reached) this.clearRound();
+            else this.gameOver();
             return true;
         }
         return false;
     },
 
+    // 現在の水揚げ額での評価
+    getGrade(earned = this.run.earned, target = this.run.target) {
+        return this.config.grades.find(g => earned >= target * g.rate) || null;
+    },
+
+    // 次の評価までの案内文
+    gradeHint() {
+        const run = this.run;
+        const next = [...this.config.grades].reverse().find(g => run.earned < run.target * g.rate);
+        if (!next) return '評価は最高の「金」です';
+        const need = Math.ceil(run.target * next.rate - run.earned);
+        return `あと ${need.toLocaleString()} G で評価「${next.name}」`;
+    },
+
+    // 目標達成後に自分から港へ戻る
+    returnToHarbor() {
+        const run = this.run;
+        if (!run || run.phase !== 'fishing' || !run.reached) return false;
+        if (FishingGame.state !== 'idle') return false;
+        this.clearRound();
+        return true;
+    },
     clearRound() {
         const run = this.run;
         const cfg = this.config;
+        const grade = this.getGrade();
+        const area = this.getArea(run.area);
 
-        // 余った基本の餌はボーナスに換金（買った餌は持ち越す）
-        const leftover = GameState.getBaitCount('bait_d');
+        // 余った支給餌はボーナスに換金（買った餌は持ち越す）。支給分から先に使った扱いにする
+        const carried = run.supply.carried || 0;
+        const leftover = Math.max(0, Math.min(run.supply.count, GameState.getBaitCount(run.supply.id) - carried));
         const leftoverBonus = leftover * cfg.leftoverBaitBonus * run.round;
+        GameState.baitInventory[run.supply.id] -= leftover;
         const clearBonus = Math.floor(run.target * cfg.clearBonusRate);
-        GameState.baitInventory.bait_d = 0;
 
         // 港フェーズに切り替えてから加算する（ボーナスは水揚げ額に数えない）
         run.phase = 'harbor';
@@ -118,15 +190,17 @@ const RunManager = {
         const isFinalClear = run.round === cfg.finalRound;
         SaveManager.recordRun(run.round, false, isFinalClear);
 
+        const rewardCount = Math.max(2, grade.rewardChoices + ((area && area.rewardChoicesDelta) || 0));
         run.harbor = {
-            summary: { earned: run.earned, target: run.target, clearBonus, leftover, leftoverBonus, isFinalClear },
+            summary: { earned: run.earned, target: run.target, grade: grade.id, clearBonus, leftover, leftoverBonus, isFinalClear },
             rewardTaken: false,
-            rewardOptions: [],
+            rewardOptions: this.pickSkills(rewardCount, run.round + 1, [], grade.tierUp),
             shopSkills: [],
             baitStock: {},
-            rerolls: 0
+            rerolls: 0,
+            freeRerolls: grade.freeRerolls,
+            areaOffers: this.pickAreas()
         };
-        run.harbor.rewardOptions = this.pickSkills(cfg.rewardChoices, run.round + 1);
         this.restockSkills();
         cfg.baitShop.forEach(item => {
             if (item.fromRound <= run.round + 1) run.harbor.baitStock[item.id] = item.stock;
@@ -136,6 +210,56 @@ const RunManager = {
         UIManager.showScreen('harbor');
     },
 
+    // 次のラウンドの海域候補（重複なし）
+    pickAreas() {
+        const pool = [...this.config.areas];
+        const offers = [];
+        while (offers.length < this.config.areaChoices && pool.length > 0) {
+            offers.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+        }
+        return offers;
+    },
+
+    // ========================================
+    // 記録（ゲームオーバー画面と、腕前の検証に使う）
+    // ========================================
+    _stats() {
+        return this.run && this.run.stats;
+    },
+
+    recordZone(zone) {
+        const stats = this._stats();
+        if (stats) stats.zones[zone]++;
+    },
+
+    recordCatch() {
+        const stats = this._stats();
+        if (!stats) return;
+        stats.casts++;
+        stats.catches++;
+        this.run.combo++;
+    },
+
+    recordEscape(fish) {
+        const stats = this._stats();
+        if (!stats) return;
+        stats.casts++;
+        stats.escapes++;
+        stats.escapedPower += fish.power;
+        this.breakCombo();
+    },
+
+    recordMiss() {
+        const stats = this._stats();
+        if (!stats) return;
+        stats.casts++;
+        this.breakCombo();
+    },
+
+    breakCombo() {
+        if (this.run.combo >= 2) UIManager.showMessage(`コンボが途切れた（×${this.run.combo}）`, 1500);
+        this.run.combo = 0;
+    },
     gameOver() {
         const run = this.run;
         run.phase = 'over';
@@ -176,7 +300,8 @@ const RunManager = {
     //   minTier: ラウンドの重みで抽選しつつ、このTier未満（特別スキル以外）を除く
     //   round:   重みの基準ラウンド（省略時は現在のラウンド）
     //   exclude: 選ばないスキルIDの配列
-    pickSkill({ tier = null, minTier = null, round = null, exclude = [] } = {}) {
+    //   tierUp:  抽選したTierを1段階上げる（評価「金」の報酬）
+    pickSkill({ tier = null, minTier = null, round = null, exclude = [], tierUp = false } = {}) {
         let targetTier = tier;
 
         if (targetTier === null) {
@@ -199,6 +324,8 @@ const RunManager = {
             }
         }
 
+        if (tierUp && targetTier >= 1 && targetTier <= 3) targetTier++;
+
         const pool = GAME_DATA.SKILLS.filter(s =>
             s.tier === targetTier && this.isOfferable(s) && !exclude.includes(s.id));
         if (pool.length === 0) return null;
@@ -206,10 +333,10 @@ const RunManager = {
     },
 
     // 重複なしで count 個のスキルIDを抽選する
-    pickSkills(count, round, exclude = []) {
+    pickSkills(count, round, exclude = [], tierUp = false) {
         const ids = [];
         for (let i = 0; i < count; i++) {
-            const skill = this.pickSkill({ round, exclude: [...exclude, ...ids] });
+            const skill = this.pickSkill({ round, exclude: [...exclude, ...ids], tierUp });
             if (skill) ids.push(skill.id);
         }
         return ids;
@@ -234,11 +361,11 @@ const RunManager = {
     },
 
     getRerollCost() {
+        if (this.run.harbor.freeRerolls > 0) return 0;
         const nextTarget = this.getTarget(this.run.round + 1);
         const raw = nextTarget * this.config.rerollBaseRate * Math.pow(this.config.rerollGrowth, this.run.harbor.rerolls);
         return Math.max(10, Math.round(raw / 10) * 10);
     },
-
     getRewardSkipBonus() {
         return Math.floor(this.run.target * this.config.rewardSkipRate);
     },
@@ -299,13 +426,16 @@ const RunManager = {
 
     rerollSkills() {
         if (!this._inHarbor()) return false;
-        if (!GameState.spendMoney(this.getRerollCost())) return false;
-
-        this.run.harbor.rerolls++;
+        const harbor = this.run.harbor;
+        if (harbor.freeRerolls > 0) {
+            harbor.freeRerolls--;
+        } else {
+            if (!GameState.spendMoney(this.getRerollCost())) return false;
+            harbor.rerolls++;
+        }
         this.restockSkills();
         return this._commit();
     },
-
     buyBait(baitId) {
         if (!this._inHarbor()) return false;
         const item = this.getBaitOffers().find(offer => offer.id === baitId);
@@ -344,9 +474,10 @@ const RunManager = {
         return this._commit();
     },
 
-    depart() {
+    depart(areaId) {
         if (!this._inHarbor() || !this.run.harbor.rewardTaken) return false;
-        this.startNextRound();
+        if (!this.run.harbor.areaOffers.includes(areaId)) return false;
+        this.startNextRound(areaId);
         return true;
     }
 };

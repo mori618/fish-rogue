@@ -17,6 +17,16 @@ const FishingGame = {
     isGachaMode: false,
     gachaResults: [],
 
+    // 餌のランクごとの、釣れる魚のランクの重み
+    SPAWN_WEIGHTS: {
+        'D': { D: 0.9, C: 0.1, S: 0.01 },
+        'C': { C: 0.8, D: 0.2, B: 0.1 },
+        'B': { B: 0.8, C: 0.2, D: 0.1, A: 0.05 },
+        'A': { A: 0.6, B: 0.4, C: 0.2, S: 0.05 },
+        'S': { A: 0.6, S: 0.2, B: 0.2, SS: 0.033 }
+    },
+    RANK_INDEX: { 'D': 0, 'C': 1, 'B': 2, 'A': 3, 'S': 4, 'SS': 5 },
+
     // ========================================
     // 初期化
     // ========================================
@@ -177,16 +187,8 @@ const FishingGame = {
                 return { ...targetPool[0] };
             }
         }
-        // 餌ごとの出現確率DCBAS
-        const spawnWeights = {
-            'D': { D: 0.9, C: 0.1, S: 0.01 },
-            'C': { C: 0.8, D: 0.2, B: 0.1 },
-            'B': { B: 0.8, C: 0.2, D: 0.1, A: 0.05 },
-            'A': { A: 0.6, B: 0.4, C: 0.2, S: 0.05 },
-            'S': { A: 0.6, S: 0.2, B: 0.2, SS: 0.033 }
-        };
-
-        let currentWeights = spawnWeights[bait.rank] || spawnWeights['D'];
+        // 餌ごとの出現確率DCBAS（定数を書き換えないようコピーして使う）
+        let currentWeights = { ...(this.SPAWN_WEIGHTS[bait.rank] || this.SPAWN_WEIGHTS['D']) };
 
         // ========================================
         // フィーバーモード (月) の場合: 指定されたランク出現率を適用
@@ -202,7 +204,16 @@ const FishingGame = {
                 'S': { A: 40, S: 50, SS: 10 }
             };
 
-            currentWeights = feverWeights[bait.rank] || feverWeights['D'];
+            currentWeights = { ...(feverWeights[bait.rank] || feverWeights['D']) };
+        }
+
+        // 海域「群れの潮」: 餌より上のランクは出ない
+        const area = GameState.getCurrentArea();
+        if (area && area.noUpperRank) {
+            Object.keys(currentWeights).forEach(rank => {
+                if (this.RANK_INDEX[rank] > this.RANK_INDEX[bait.rank]) delete currentWeights[rank];
+            });
+            if (Object.keys(currentWeights).length === 0) currentWeights[bait.rank] = 1;
         }
 
 
@@ -555,6 +566,7 @@ const FishingGame = {
             console.log('⏰ ヒット窓口終了: 反応が遅かった');
             // 時間切れで逃げられた
             this.state = 'result';
+            RunManager.recordMiss();
             UIManager.showMissed('反応が遅かった！魚に逃げられた...');
 
             // 餌を消費（ヒットを逃した＝失敗）
@@ -704,7 +716,14 @@ const FishingGame = {
         redZoneWidth = Math.min(redZoneWidth, 40); // 最大幅を制限
 
         // UIにゲージを表示
-        UIManager.showGaugeBattle(this.currentFish, redZoneWidth);
+        const phases = ['S', 'SS'].includes(this.currentFish.rarity) ? 2 : 1;
+        UIManager.showGaugeBattle(this.currentFish, redZoneWidth, {
+            power: playerPower,
+            matchup: this.getMatchup(this.currentFish, playerPower),
+            rates: this.getZoneRates(this.currentFish, playerPower),
+            phase: this.battlePhase,
+            phases
+        });
 
         // ゲージアニメーション開始
         this.gaugePosition = 0;
@@ -735,110 +754,112 @@ const FishingGame = {
     },
 
     // ========================================
+    // 捕獲率の計算（ゲージ表示・港の目安・判定で共通）
+    // ========================================
+    // 対戦の格付け: 余裕 / 互角 / 格上 / 無謀
+    getMatchup(fish, power = GameState.getTotalPower()) {
+        const ratio = power / Math.max(1, fish.power);
+        if (ratio >= 1.0) return { id: 'easy', label: '余裕' };
+        if (ratio >= 0.7) return { id: 'even', label: '互角' };
+        if (ratio >= 0.4) return { id: 'hard', label: '格上' };
+        return { id: 'reckless', label: '無謀' };
+    },
+
+    // ゾーンごとの捕獲率（緑・白は範囲の平均値）
+    getZoneRates(fish, power = GameState.getTotalPower(), baitId = GameState.baitType) {
+        const zones = GAME_DATA.GAUGE_CONFIG.zones;
+        const bonus = GameState.getCatchBonus();
+        const avg = z => (z.catchRate.min + z.catchRate.max) / 2;
+        const clamp = v => Math.max(0, Math.min(1, v));
+
+        // 赤: 餌と魚のランク差とパワー差で決まる。緑+10ポイントを下限にする
+        const bait = GAME_DATA.BAITS.find(b => b.id === baitId) || GAME_DATA.BAITS[0];
+        const rankDiff = (this.RANK_INDEX[fish.rarity] || 0) - (this.RANK_INDEX[bait.rank] || 0);
+        let base = 0.9;
+        if (rankDiff === 1) base = 0.8;
+        else if (rankDiff === 2) base = 0.6;
+        else if (rankDiff >= 3) base = 0.4;
+        const powerPenalty = Math.max(0, fish.power - power) / Math.max(1, power) * 0.5;
+        let red = Math.max(base - powerPenalty, GAME_DATA.ROGUE_CONFIG.redZoneFloor);
+        if (GameState.hasPerfectMaster && GameState.hasPerfectMaster()) red = 1.0;
+
+        const isSS = fish.rarity === 'SS';  // SSは赤ゾーン以外では釣れない
+        return {
+            red: clamp(red + bonus),
+            green: isSS ? 0 : clamp(avg(zones.green) + bonus),
+            white: isSS ? 0 : clamp(avg(zones.white) + bonus)
+        };
+    },
+
+    // 魚1匹を釣り上げられる確率の目安（標準的な腕前: 赤45% / 緑35% / 白20% に止める）
+    estimateCatchChance(fish, power, baitId) {
+        const forced = ['A', 'S', 'SS'].includes(fish.rarity);
+        if (power >= fish.power && !forced) return 1;
+        const r = this.getZoneRates(fish, power, baitId);
+        const one = 0.45 * r.red + 0.35 * r.green + 0.2 * r.white;
+        return ['S', 'SS'].includes(fish.rarity) ? one * one : one;  // S以上は2連戦
+    },
+
+    // 餌1つで1匹釣れる確率の目安（港の表示用）
+    estimateBaitSuccess(baitId, power = GameState.getTotalPower()) {
+        const bait = GAME_DATA.BAITS.find(b => b.id === baitId);
+        const weights = this.SPAWN_WEIGHTS[bait.rank];
+        const total = Object.values(weights).reduce((a, b) => a + b, 0);
+        let chance = 0;
+        Object.entries(weights).forEach(([rank, w]) => {
+            const pool = GAME_DATA.FISH.filter(f => f.rarity === rank);
+            const poolWeight = pool.reduce((a, f) => a + f.weight, 0);
+            pool.forEach(fish => {
+                chance += (w / total) * (fish.weight / poolWeight) * this.estimateCatchChance(fish, power, baitId);
+            });
+        });
+        return chance;
+    },
+
+    // ========================================
     // ゲージバトル解決
     // ========================================
     resolveCatch() {
         // 二重クリック防止
         this.isProcessing = true;
-
-        // アニメーション停止
         cancelAnimationFrame(this.gaugeAnimationId);
 
-        // ゾーン判定
         let zone = UIManager.getGaugeZone(this.gaugePosition);
+        RunManager.recordZone(zone);
 
-        // 起死回生スキルの反映
-        if (zone === 'white') {
-            const secondChanceRate = GameState.getSecondChanceRate();
-            if (Math.random() < secondChanceRate) {
-                zone = 'green';
-                console.log('⚡ 起死回生発動！白ゾーンを成功扱いに変更');
-            }
+        // 起死回生スキル: 白ゾーンを緑扱いにすることがある
+        if (zone === 'white' && Math.random() < GameState.getSecondChanceRate()) {
+            zone = 'green';
+            UIManager.showMessage('⚡ 起死回生！', 1000);
         }
 
-        const config = GAME_DATA.GAUGE_CONFIG.zones[zone];
-
-        // 捕獲確率を計算
-        let catchRate;
-
-        if (zone === 'red') {
-            // ========================================
-            // 赤ゲージ停止時の動的成功率計算
-            // ========================================
-            const bait = GAME_DATA.BAITS.find(b => b.id === GameState.baitType) || GAME_DATA.BAITS[0];
-            const rankIndices = { 'D': 0, 'C': 1, 'B': 2, 'A': 3, 'S': 4, 'SS': 5 };
-
-            const fishRank = rankIndices[this.currentFish.rarity] || 0;
-            const baitRank = rankIndices[bait.rank] || 0;
-            const rankDiff = fishRank - baitRank;
-
-            // ランク差によるベース成功率
-            let baseRate = 0.9; // 同ランク or 格下
-            if (rankDiff === 1) baseRate = 0.8;      // 1つ上
-            else if (rankDiff === 2) baseRate = 0.6; // 2つ上
-            else if (rankDiff >= 3) baseRate = 0.4;  // 3つ上 (それ以上も一旦40%ベース)
-
-            // パワー差による補正
-            const playerPower = GameState.getTotalPower();
-            const fishPower = this.currentFish.power;
-            const powerDiff = Math.max(0, fishPower - playerPower);
-
-            // パワー差が大きいほど減衰 
-            // 例: パワー差がプレイヤーパワーと同じだけある(倍の敵)場合、-50%
-            const powerPenalty = (powerDiff / Math.max(1, playerPower)) * 0.5;
-
-            catchRate = baseRate - powerPenalty;
-
-            // ユーザー要望: パワー差がありすぎても0%にはしない (最低1%保証)
-            if (catchRate < 0.01) {
-                catchRate = 0.01;
-            }
-
-            // ログ出力
-            console.log(`📊 キャッチ判定: ランク差${rankDiff}(${baseRate * 100}%) - パワー罰則${(powerPenalty * 100).toFixed(1)}% = ${(catchRate * 100).toFixed(1)}% (Min 5%)`);
-
-
-        } else {
-            // 赤以外は従来通りの設定値
-            catchRate = config.catchRate.min +
-                Math.random() * (config.catchRate.max - config.catchRate.min);
+        const power = GameState.getTotalPower();
+        const rates = this.getZoneRates(this.currentFish, power);
+        let catchRate = rates[zone];
+        if (zone !== 'red') {
+            // 緑・白は範囲内でばらつく
+            const z = GAME_DATA.GAUGE_CONFIG.zones[zone];
+            catchRate = Math.min(1, z.catchRate.min + Math.random() * (z.catchRate.max - z.catchRate.min) + GameState.getCatchBonus());
+            if (this.currentFish.rarity === 'SS') catchRate = 0;
         }
 
-        // 達人の針スキル: 赤ゾーンなら確定 (100%)
-        if (zone === 'red' && GameState.hasPerfectMaster && GameState.hasPerfectMaster()) {
-            catchRate = 1.0;
-            console.log('✨ 達人の針発動！赤ゾーン確定');
-        }
-
-        // スキルボーナス
-        catchRate += GameState.getCatchBonus();
-        catchRate = Math.min(1, catchRate);  // 100%が上限
-
-        // SSランクは赤ゲージ必須（それ以外は0%）
-        if (this.currentFish.rarity === 'SS' && zone !== 'red') {
-            console.log('⛔ SSランク制約: 赤ゲージ以外は失敗');
-            catchRate = 0;
-        }
-
-        console.log(`🎯 ゾーン: ${zone}, 捕獲率: ${(catchRate * 100).toFixed(1)}%`);
+        // 逃げられたときに表示する理由
+        let reason = '';
+        if (zone === 'white') reason = '白ゾーンで止めた';
+        else if (zone === 'green') reason = '緑ゾーンで止めた';
+        else if (power < this.currentFish.power) reason = `パワー不足（${power} 対 ${this.currentFish.power}）`;
+        else reason = 'あと一歩だった';
 
         // 少し停止して見せてから結果を表示
         setTimeout(() => {
             this.isProcessing = false;
-
-            // 実際の決着に合わせて竿を振り上げる
             UIManager.updateRodView('strike');
 
-            const isSuccess = Math.random() < catchRate;
-
-            if (isSuccess) {
+            if (Math.random() < catchRate) {
                 // S, SSランクは2連戦
                 if (['S', 'SS'].includes(this.currentFish.rarity) && this.battlePhase === 1) {
-                    console.log('⚔️ 連戦発生！ Round 2 Start');
                     this.battlePhase = 2;
                     UIManager.showMessage('まだまだ！', 1000);
-
-                    // 少し間を置いて2回戦開始
                     setTimeout(() => {
                         this.startGaugeBattle(GameState.getTotalPower(), this.currentFish.power);
                     }, 1000);
@@ -846,14 +867,11 @@ const FishingGame = {
                     this.catchSuccess();
                 }
             } else {
-                // 赤ゲージで止めた場合はペナルティ免除 (成功率の壁で逃げられただけなので)
-                // それ以外の色で止めて失敗した場合はペナルティ対象
-                const skipPenalty = (zone === 'red');
-                this.catchFailed(skipPenalty);
+                // 赤ゾーンで止めた場合はペナルティ免除（成功率の壁で逃げられただけなので）
+                this.catchFailed(zone === 'red', reason);
             }
         }, 1000);
     },
-
     // ========================================
     // 釣り上げ成功
     // ========================================
@@ -913,10 +931,12 @@ const FishingGame = {
         }
 
         // ----------------------------------------
-        // その場で売却して水揚げ額に加算
+        // その場で売却して水揚げ額に加算（コンボ補正はこの一投までの連続数で計算）
         // ----------------------------------------
+        const comboBonus = GameState.getComboBonus();
         const earned = GameState.getSalePrice(fish) * catchCount;
         GameState.addMoney(earned);
+        RunManager.recordCatch();
 
         // 称号付き: ボーナスとしてTier2以上のスキルを1つ
         const drops = [];
@@ -929,7 +949,9 @@ const FishingGame = {
         }
 
         UIManager.updateStatus();
-        UIManager.showCatchSuccess(fish, () => this.endTurn(true), catchCount, drops, earned);
+        // 称号付き・スキル獲得のときだけタップ待ち、それ以外は自動で閉じる
+        const holdOpen = fish.hasTitle || drops.length > 0;
+        UIManager.showCatchSuccess(fish, () => this.endTurn(true), catchCount, drops, earned, { comboBonus, autoClose: !holdOpen });
 
         console.log(`🎉 ${fish.name}を釣り上げた！ (x${catchCount}) +${earned}G`);
     },
@@ -954,6 +976,7 @@ const FishingGame = {
 
         this.applyFailurePenalty();
 
+        RunManager.recordMiss();
         UIManager.showMissed('タイミングが早すぎた！');
         console.log('💔 タイミングが早すぎた！');
 
@@ -963,7 +986,7 @@ const FishingGame = {
     // ========================================
     // 釣り上げ失敗
     // ========================================
-    catchFailed(skipPenalty = false) {
+    catchFailed(skipPenalty = false, reason = '') {
         // すべてのタイマーとアニメーションをクリア
         this.cleanupTimers();
 
@@ -985,10 +1008,12 @@ const FishingGame = {
         }
 
         if (this.currentFish) {
+            RunManager.recordEscape(this.currentFish);
             // ユーザーが閉じたら次の一投へ
-            UIManager.showCatchFailed(this.currentFish, () => this.endTurn());
+            UIManager.showCatchFailed(this.currentFish, () => this.endTurn(), reason);
             console.log(`💔 ${this.currentFish.name}に逃げられた...`);
         } else {
+            RunManager.recordMiss();
             UIManager.showMissed('魚に逃げられた...');
             setTimeout(() => this.endTurn(), 1500);
         }
@@ -1060,7 +1085,10 @@ const FishingGame = {
         const feverMult = GameState.getFeverRewardMultiplier();
 
         // 1. お金 (量と質の両方が乗る)
-        const baseMoney = lootTable.money.min + Math.floor(Math.random() * (lootTable.money.max - lootTable.money.min + 1));
+        // お金はラウンドの目標額に比例させる（序盤に1個で目標達成、終盤に誤差、を防ぐ）
+        const [minRate, maxRate] = GAME_DATA.ROGUE_CONFIG.treasureMoneyRate[type];
+        const target = GameState.run ? GameState.run.target : 100;
+        const baseMoney = Math.floor(target * (minRate + Math.random() * (maxRate - minRate)));
         const finalMoney = Math.floor(baseMoney * quantityMult * qualityMult * feverMult);
 
         GameState.addMoney(finalMoney);
@@ -1299,16 +1327,20 @@ const FishingGame = {
     // 共通の失敗ペナルティ処理
     // ========================================
     applyFailurePenalty() {
-        const penalty = GameState.getPenaltyStatus();
+        // 闇取引: 失敗するとそのラウンドの水揚げが減る（所持金からも同額を引く）
+        let rate = 0;
+        GameState.getEffectsByType('high_risk_sell').forEach(effect => {
+            rate = Math.max(rate, effect.penaltyRate || 0);
+        });
+        const run = GameState.run;
+        if (rate <= 0 || !run || run.phase !== 'fishing') return;
 
-        // 闇取引: 失敗すると所持金の一部を失う
-        if (penalty.highRiskSell) {
-            const loss = Math.floor(GameState.money * 0.1);
-            if (loss > 0) {
-                GameState.money -= loss;
-                UIManager.showMessage(`💸 ペナルティ: -${loss}G`, 3000);
-                UIManager.updateMoney();
-            }
+        const loss = Math.min(Math.floor(run.earned * rate), GameState.money);
+        if (loss > 0) {
+            run.earned -= loss;
+            GameState.money -= loss;
+            UIManager.showMessage(`💸 闇取引のペナルティ: -${loss.toLocaleString()} G`, 2500);
+            UIManager.updateStatus();
         }
     }
 };

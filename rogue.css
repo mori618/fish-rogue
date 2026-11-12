@@ -1,8 +1,50 @@
 /* ========================================
    フィッシング・ローグ 追加スタイル
-   ローグライト化で増えた部品（ラウンド表示・港・ゲームオーバー）のみを定義する。
-   色やボタンなどの基本の見た目は styles.css のものをそのまま使う。
+   ローグライト化で増えた部品（上部バー・餌スロット・港・モーダル）を定義する。
+   色やボタンなどの基本の見た目は styles.css のもの（木目調）をそのまま使う。
    ======================================== */
+
+/* ----------------------------------------
+   共通
+   ---------------------------------------- */
+/* アイコンフォントが読み込めなくても、名前の文字列でレイアウトが崩れないよう枠を固定する */
+.material-icons {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    overflow: hidden;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+/* ヘルプ本文は左ぞろえで読みやすく */
+.help-body,
+.help-body .help-section,
+.help-simple-list li {
+    text-align: left;
+}
+
+/* 通知は上部バーの下に出し、数字を隠さない */
+.notification-banner {
+    top: calc(104px + env(safe-area-inset-top));
+    min-width: 0;
+    width: min(92vw, 420px);
+}
+
+/* 港ではビルド帯を隠さないよう、フッターの上に出す */
+body[data-screen="harbor"] .notification-banner {
+    top: auto;
+    bottom: calc(180px + env(safe-area-inset-bottom));
+}
+
+.btn.disabled {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+}
+
+.rg-low {
+    color: #fca5a5 !important;
+}
 
 /* ----------------------------------------
    スタート画面
@@ -21,54 +63,329 @@
 }
 
 /* ----------------------------------------
-   釣り画面: ラウンド目標パネル
+   釣り画面: 上部バー
    ---------------------------------------- */
-.rg-run-panel {
-    min-width: 170px;
-    margin-top: 0;
+.rg-hud-top {
+    position: absolute;
+    top: calc(10px + env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(94vw, 440px);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.rg-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    color: var(--text-light);
+    background: linear-gradient(135deg, #a1887f 0%, #8d6e63 100%);
+    border: 3px solid #4e342e;
+    border-radius: 50px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+
+.rg-round {
+    font-weight: 900;
+    font-size: 16px;
+    color: var(--accent-yellow);
+    text-shadow: 1px 1px 0 #4e342e;
 }
 
 .rg-progress {
-    height: 8px;
-    margin: 4px 0 6px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-    overflow: hidden;
+    position: relative;
+    flex: 1;
+    height: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    overflow: visible;
 }
 
 .rg-progress-fill {
     width: 0;
     height: 100%;
     background: linear-gradient(90deg, #fbbf24, #f59e0b);
-    border-radius: 4px;
-    transition: width 0.4s ease;
+    border-radius: 6px;
+    transition: width 0.5s ease;
 }
 
-/* 目標の進み具合は一番見る情報なので、狭い画面でも縮めない */
-#run-panel {
-    padding: 8px 12px;
+.rg-progress.rg-reached .rg-progress-fill {
+    background: linear-gradient(90deg, #4ade80, #22c55e);
 }
 
-#run-panel .mission-label {
-    font-size: 11px;
+/* 評価の目盛り（達成後に表示） */
+.rg-mark {
+    position: absolute;
+    top: -4px;
+    width: 3px;
+    height: 20px;
+    margin-left: -1px;
+    border-radius: 2px;
 }
 
-#run-panel .mission-text {
+.rg-mark-silver { background: #e5e7eb; }
+.rg-mark-gold { background: #ffd700; }
+
+.rg-progress-text,
+.rg-money {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.rg-money {
+    position: relative;
+    color: var(--accent-yellow);
+}
+
+/* 所持金の増減ポップ */
+.rg-money-popup {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    font-size: 14px;
+    font-weight: 900;
+    pointer-events: none;
+    animation: rgMoneyPop 1.2s ease-out forwards;
+}
+
+.rg-money-popup.plus { color: #4ade80; }
+.rg-money-popup.minus { color: #f87171; }
+
+@keyframes rgMoneyPop {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(26px); opacity: 0; }
+}
+
+#harbor-screen .shop-money {
+    position: relative;
+}
+
+/* チップ（パワー・コンボ・海域・ヘルプ） */
+.rg-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.rg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    padding: 2px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 16px;
+}
+
+.rg-chip .material-icons {
+    font-size: 16px;
+}
+
+.rg-chip-combo {
+    color: #3e2723;
+    background: linear-gradient(135deg, #ffd700, #f59e0b);
+    border-color: #b45309;
+}
+
+.rg-chip-btn {
+    margin-left: auto;
+    min-width: 44px;
+    min-height: 40px;
+    justify-content: center;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+/* ----------------------------------------
+   釣り画面: 下部HUD（装備・帰港・餌スロット）
+   ---------------------------------------- */
+.rg-hud-bottom {
+    flex-direction: column;
+    gap: 8px;
+    width: min(94vw, 440px);
+    padding: 10px 16px 12px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    border-radius: 24px;
+}
+
+.rg-hud-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.rg-small-btn {
+    width: 56px;
+    height: 48px;
+}
+
+.rg-return-btn {
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%);
+    border-color: #166534;
+    box-shadow: 0 4px 0 #14532d, 0 6px 10px rgba(0, 0, 0, 0.3);
+    animation: rgPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rgPulse {
+    50% { box-shadow: 0 4px 0 #14532d, 0 0 18px 4px rgba(74, 222, 128, 0.8); }
+}
+
+.rg-bait-total {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-light);
+    text-shadow: 1px 1px 0 #4e342e;
+}
+
+.rg-bait-slots {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.rg-bait-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    font-family: inherit;
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.rg-bait-slot.selected {
+    background: rgba(255, 215, 0, 0.2);
+    border: 3px solid var(--accent-yellow);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+}
+
+.rg-bait-slot:active {
+    transform: scale(0.92);
+}
+
+.rg-bait-rank {
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+.rg-bait-count {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #fff;
+}
+
+.rg-bait-empty {
+    font-size: 13px;
+    color: var(--text-light);
+}
+
+/* ----------------------------------------
+   ゲージバトル
+   ---------------------------------------- */
+.rg-battle-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 12px;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.rg-battle-rank {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.rg-matchup {
+    padding: 2px 14px;
+    font-size: 15px;
+    font-weight: 900;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.rg-matchup-easy { color: #4ade80; }
+.rg-matchup-even { color: #fde047; }
+.rg-matchup-hard { color: #fb923c; }
+.rg-matchup-reckless { color: #f87171; }
+
+.rg-battle-power {
     font-family: 'Roboto Mono', monospace;
     font-size: 14px;
 }
 
-/* 釣り画面: 餌の合計 */
-.rg-bait-total {
-    margin-top: 2px;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-light);
-    white-space: nowrap;
+.rg-phase-dots {
+    display: flex;
+    gap: 8px;
 }
 
-.rg-bait-total.rg-low {
-    color: #fca5a5;
+.rg-phase-dots span {
+    width: 10px;
+    height: 10px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+}
+
+.rg-phase-dots span.on {
+    background: #fff;
+}
+
+.rg-zone-rates {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 8px;
+    padding: 4px 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 10px;
+}
+
+.rg-zone-white { color: #e5e7eb; }
+.rg-zone-red { color: #fca5a5; }
+.rg-zone-green { color: #86efac; }
+
+/* 結果カードの追記 */
+.rg-combo-line {
+    margin-top: 8px;
+    font-weight: 900;
+    color: var(--accent-yellow);
+}
+
+.rg-fail-reason {
+    margin-top: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fde68a;
 }
 
 /* ----------------------------------------
@@ -79,42 +396,83 @@
     color: var(--text-primary);
 }
 
-.rg-harbor-footer {
-    align-items: center;
-    padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
+/* ビルド帯 */
+.rg-build {
+    position: sticky;
+    top: calc(-1 * var(--spacing-md));
+    z-index: 5;
+    margin: calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) var(--spacing-md);
+    padding: 10px var(--spacing-md);
+    background: #4e342e;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-.rg-next-info {
-    flex: 1;
+.rg-build-head {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--text-secondary);
 }
 
-.rg-next-label {
-    font-size: 11px;
-    font-weight: 900;
-    letter-spacing: 1px;
-    color: var(--accent-color);
+.rg-build-head strong {
+    font-size: 16px;
+    color: var(--text-primary);
 }
 
-.rg-next-value {
-    font-size: 13px;
-    font-weight: 700;
+.rg-skill-row,
+.rg-bench {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
 }
 
-#depart-btn {
-    padding: var(--spacing-sm) var(--spacing-lg);
-    font-size: 18px;
+.rg-bench {
+    align-items: center;
 }
 
-#depart-btn:disabled {
-    filter: grayscale(1);
-    opacity: 0.5;
-    cursor: not-allowed;
+.rg-bench-label {
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
+.rg-skill-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    color: var(--rg-tier-color, #fff);
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px solid var(--rg-tier-color, var(--border-color));
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.rg-skill-chip .material-icons {
+    font-size: 24px;
+}
+
+.rg-skill-chip.rg-empty {
+    border: 2px dashed rgba(255, 255, 255, 0.25);
+    cursor: default;
+}
+
+.rg-skill-chip.rg-benched {
+    width: 36px;
+    height: 36px;
+    opacity: 0.75;
+    border-style: dashed;
+}
+
+.rg-skill-chip.rg-benched .material-icons {
+    font-size: 20px;
+}
+
+/* 結果・報酬 */
 .rg-banner {
     display: flex;
     align-items: center;
@@ -139,6 +497,7 @@
 .rg-summary-row {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     gap: var(--spacing-md);
     padding: 6px 0;
     font-size: 14px;
@@ -158,6 +517,24 @@
 .rg-summary-row strong.rg-plus {
     color: #4ade80;
 }
+
+.rg-grade {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 18px;
+}
+
+.rg-grade small {
+    font-family: var(--font-main);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.rg-grade-gold { color: #ffd700 !important; }
+.rg-grade-silver { color: #e5e7eb !important; }
+.rg-grade-bronze { color: #d6a77a !important; }
 
 .rg-section-head {
     display: flex;
@@ -186,11 +563,19 @@
     color: var(--text-secondary);
 }
 
-/* 報酬スキルの3択 */
+/* 報酬スキルの3〜4択 */
 .rg-reward-list {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-sm);
+}
+
+.rg-reward-list.rg-count-4 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.rg-reward-list.rg-count-2 {
+    grid-template-columns: repeat(2, 1fr);
 }
 
 .rg-reward-card {
@@ -212,10 +597,6 @@
 .rg-reward-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 12px var(--rg-tier-color, transparent);
-}
-
-.rg-reward-card:active {
-    transform: translateY(1px);
 }
 
 .rg-reward-icon {
@@ -249,19 +630,12 @@
 .rg-tier-badge {
     display: inline-block;
     padding: 1px 8px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     color: #1c1410;
     background: var(--rg-tier-color);
     border-radius: 10px;
     vertical-align: middle;
-}
-
-/* 商品行（styles.css の .shop-item に載せる部品） */
-#harbor-screen .shop-item,
-.rg-modal .shop-item {
-    gap: var(--spacing-sm);
-    padding: 10px var(--spacing-md);
 }
 
 .rg-skill-icon {
@@ -270,16 +644,104 @@
     color: var(--rg-tier-color);
 }
 
+/* ショップのカード（横並び） */
+.rg-card-row {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.rg-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.rg-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.rg-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+.rg-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 10px 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    text-align: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.rg-skill-card {
+    border: 2px solid var(--rg-tier-color, var(--border-color));
+}
+
+.rg-card:not(:disabled):not(.locked):not(.sold):active {
+    transform: scale(0.97);
+}
+
+.rg-card.sold,
+.rg-card.locked {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.rg-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rg-card-name {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.rg-card-desc {
+    flex: 1;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text-secondary);
+}
+
+.rg-price {
+    margin-top: 4px;
+    padding: 4px 10px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+}
+
+.rg-price.rg-short {
+    font-size: 12px;
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.rg-card.sold .rg-price {
+    background: transparent;
+    color: var(--text-secondary);
+}
+
 .rg-rank-chip {
     flex-shrink: 0;
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 18px;
     font-weight: 900;
     border: 2px solid currentColor;
     border-radius: 50%;
+}
+
+.rg-rate {
+    font-size: 13px;
+    font-weight: 700;
+    color: #86efac;
 }
 
 .rg-stars {
@@ -287,30 +749,11 @@
     letter-spacing: 1px;
 }
 
-.rg-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.rg-actions:empty {
-    display: none;
-}
-
-#harbor-screen .btn {
-    padding: 8px 12px;
-    white-space: nowrap;
-}
-
-.btn.disabled {
-    opacity: 0.45;
-    filter: grayscale(0.6);
-}
-
 .rg-reroll-btn {
     display: flex;
     align-items: center;
     gap: 4px;
+    min-height: 36px;
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid var(--secondary-color);
@@ -326,12 +769,6 @@
     border: 1px solid var(--accent-color);
 }
 
-.rg-sold {
-    font-size: 12px;
-    color: var(--text-secondary);
-    white-space: nowrap;
-}
-
 .rg-empty-slot {
     padding: 10px var(--spacing-md);
     font-size: 13px;
@@ -341,17 +778,101 @@
     border-radius: var(--radius-md);
 }
 
+/* フッター: 海域カード＝出航ボタン */
+.rg-harbor-footer {
+    flex-direction: column;
+    padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
+}
+
+.rg-next-info {
+    width: 100%;
+}
+
+.rg-next-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-color);
+}
+
+.rg-next-supply {
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.rg-area-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+}
+
+.rg-area-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 12px;
+    color: #efebe9;
+    font-family: inherit;
+    text-align: left;
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    border: 2px solid #0c4a6e;
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 0 #0c4a6e;
+    cursor: pointer;
+}
+
+.rg-area-card:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #0c4a6e;
+}
+
+.rg-area-card:disabled {
+    filter: grayscale(1);
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.rg-area-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.rg-area-target {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent-yellow);
+}
+
+.rg-area-desc {
+    font-size: 12px;
+    line-height: 1.35;
+    color: #e0f2fe;
+}
+
+.rg-summary-row .rg-area-desc {
+    color: var(--text-secondary);
+    text-align: right;
+}
+
 /* ----------------------------------------
-   モーダル（装備確認・ゲームオーバー）
+   モーダル（スキル詳細・装備確認・ゲームオーバー）
    ---------------------------------------- */
 .rg-modal {
     width: min(92vw, 420px);
     max-width: 420px;
     max-height: 86vh;
-    text-align: left;
     display: flex;
     flex-direction: column;
     padding: var(--spacing-md);
+    text-align: left;
     color: var(--text-primary);
     background: var(--bg-card);
     border: 2px solid var(--border-color);
@@ -373,8 +894,30 @@
     font-size: 18px;
 }
 
+.rg-modal .shop-item {
+    gap: var(--spacing-sm);
+    padding: 10px var(--spacing-md);
+}
+
 .rg-modal-body {
     overflow-y: auto;
+}
+
+.rg-skill-detail {
+    margin-bottom: var(--spacing-sm);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.rg-modal-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.rg-modal-actions .btn {
+    flex: 1;
+    min-height: 44px;
 }
 
 .rg-note {
@@ -424,7 +967,8 @@
    狭い画面
    ---------------------------------------- */
 @media (max-width: 480px) {
-    .rg-reward-list {
+    .rg-reward-list,
+    .rg-reward-list.rg-count-4 {
         grid-template-columns: 1fr;
     }
 
@@ -441,4 +985,6 @@
     .rg-reward-name { grid-area: name; }
     .rg-reward-desc { grid-area: desc; }
     .rg-reward-card .rg-tier-badge { grid-area: badge; }
+
+    .rg-cols-4 { grid-template-columns: repeat(2, 1fr); }
 }

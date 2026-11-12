@@ -6,6 +6,7 @@ const UIManager = {
     // 現在の画面
     // ========================================
     currentScreen: 'start',  // start, fishing, harbor, encyclopedia
+    lastMoney: null,
 
     // ========================================
     // ゲージバトル設定
@@ -25,6 +26,7 @@ const UIManager = {
         if (screen) {
             screen.classList.add('active');
             this.currentScreen = screenId;
+            document.body.dataset.screen = screenId;
         }
 
         // 画面固有の初期化
@@ -65,10 +67,9 @@ const UIManager = {
     updateStatus() {
         this.updateMoney();
         this.updateRunPanel();
-        this.updateRodInfo();
+        this.updateChips();
         this.updateBaitInfo();
     },
-
     // 所持金とパワー
     updateMoney() {
         const money = `${GameState.money.toLocaleString()} G`;
@@ -77,54 +78,108 @@ const UIManager = {
             if (el) el.textContent = money;
         });
 
+        // 増減を数字の横に短く浮かせる
+        if (this.lastMoney !== null && GameState.money !== this.lastMoney) {
+            this.showMoneyPopup(GameState.money - this.lastMoney);
+        }
+        this.lastMoney = GameState.money;
+
         const powerDisplay = document.getElementById('power-display');
         if (powerDisplay) {
             powerDisplay.textContent = `${GameState.getTotalPower()} P`;
         }
     },
 
+    showMoneyPopup(diff) {
+        const target = this.currentScreen === 'harbor'
+            ? document.getElementById('shop-money-display')
+            : document.getElementById('money-display');
+        if (!target || !target.parentElement) return;
+
+        const popup = document.createElement('span');
+        popup.className = `rg-money-popup ${diff > 0 ? 'plus' : 'minus'}`;
+        popup.textContent = `${diff > 0 ? '+' : ''}${diff.toLocaleString()}`;
+        target.parentElement.appendChild(popup);
+        setTimeout(() => popup.remove(), 1200);
+    },
     // ラウンドと目標の進み具合
     updateRunPanel() {
         const run = GameState.run;
         if (!run) return;
 
-        const finalRound = GAME_DATA.ROGUE_CONFIG.finalRound;
         const label = document.getElementById('round-label');
         const text = document.getElementById('round-progress-text');
         const bar = document.getElementById('round-progress-bar');
+        const progress = document.getElementById('round-progress');
+        if (label) label.textContent = `R${run.round}`;
+        if (text) text.textContent = `${run.earned.toLocaleString()}/${run.target.toLocaleString()}`;
 
-        if (label) label.textContent = run.round <= finalRound ? `ROUND ${run.round} / ${finalRound}` : `ROUND ${run.round}（エンドレス）`;
-        if (text) text.textContent = `${run.earned.toLocaleString()} / ${run.target.toLocaleString()} G`;
-        if (bar) bar.style.width = `${Math.min(100, (run.earned / run.target) * 100)}%`;
+        // 達成前は目標までのバー。達成後は目標の2倍までに伸ばし、銀・金の目盛りを出す
+        const scale = run.reached ? run.target * 2 : run.target;
+        if (bar) bar.style.width = `${Math.min(100, (run.earned / scale) * 100)}%`;
+        if (progress) progress.classList.toggle('rg-reached', run.reached);
+        ['silver', 'gold'].forEach(id => {
+            const mark = document.getElementById(`round-mark-${id}`);
+            const grade = GAME_DATA.ROGUE_CONFIG.grades.find(g => g.id === id);
+            if (!mark || !grade) return;
+            mark.classList.toggle('hidden', !run.reached);
+            mark.style.left = `${(grade.rate / 2) * 100}%`;
+        });
+
+        const returnBtn = document.getElementById('return-btn');
+        if (returnBtn) returnBtn.classList.toggle('hidden', !(run.reached && run.phase === 'fishing'));
     },
 
+    // パワー以外のチップ（コンボ・海域）
+    updateChips() {
+        const run = GameState.run;
+        if (!run) return;
+
+        const combo = document.getElementById('combo-chip');
+        if (combo) {
+            const bonus = GameState.getComboBonus();
+            combo.classList.toggle('hidden', run.combo < 1);
+            combo.textContent = `×${run.combo} +${Math.round(bonus * 100)}%`;
+        }
+
+        const areaChip = document.getElementById('area-chip');
+        const area = GameState.getCurrentArea();
+        if (areaChip && area) {
+            areaChip.innerHTML = `<span class="material-icons">${area.icon}</span><span>${area.name}</span>`;
+            areaChip.title = area.description;
+        }
+    },
     // 餌セレクター（所持している餌の切り替えと残り数）
     updateBaitInfo() {
-        const baitInfo = document.getElementById('bait-info');
-        if (!baitInfo) return;
+        const slots = document.getElementById('bait-info');
+        if (!slots) return;
 
-        const bait = GAME_DATA.BAITS.find(b => b.id === GameState.baitType) || GAME_DATA.BAITS[0];
-        const count = GameState.getBaitCount(bait.id);
+        // 持っている餌を丸いスロットで並べ、タップで選ぶ
+        const owned = GAME_DATA.BAITS.filter(b => GameState.getBaitCount(b.id) > 0);
+        slots.innerHTML = owned.map(bait => {
+            const count = GameState.getBaitCount(bait.id);
+            const selected = bait.id === GameState.baitType;
+            return `
+                <button class="rg-bait-slot ${selected ? 'selected' : ''}" onclick="UIManager.selectBait('${bait.id}')" aria-label="${bait.name} ${count}個">
+                    <span class="rg-bait-rank rarity-${bait.rank}">${bait.rank}</span>
+                    <span class="rg-bait-count ${count <= 1 ? 'rg-low' : ''}">×${count}</span>
+                </button>
+            `;
+        }).join('') || '<div class="rg-bait-empty">餌がありません</div>';
+
         const total = GameState.getTotalBaitCount();
-        const ownedTypes = GAME_DATA.BAITS.filter(b => GameState.getBaitCount(b.id) > 0).length;
-        const arrowsHidden = ownedTypes <= 1 ? 'style="visibility: hidden;"' : '';
-
-        baitInfo.innerHTML = `
-            <button class="selector-btn prev" ${arrowsHidden} onclick="GameState.switchBait(-1); UIManager.updateBaitInfo();"><span class="material-icons">chevron_left</span></button>
-            <span class="bait-label-container">
-                <span class="bait-name-text">${bait.name}</span>
-                <span class="bait-count-text">× ${count}</span>
-            </span>
-            <button class="selector-btn next" ${arrowsHidden} onclick="GameState.switchBait(1); UIManager.updateBaitInfo();"><span class="material-icons">chevron_right</span></button>
-        `;
-
         const totalEl = document.getElementById('bait-total');
         if (totalEl) {
-            totalEl.textContent = `残りの餌 合計 ${total}`;
+            totalEl.textContent = `残りの餌 ${total}`;
             totalEl.classList.toggle('rg-low', total <= 3);
         }
     },
 
+    selectBait(baitId) {
+        if (FishingGame.state !== 'idle' || GameState.getBaitCount(baitId) <= 0) return;
+        GameState.baitType = baitId;
+        this.updateBaitInfo();
+    },
     // ========================================
     // 釣り画面: 待機状態
     // ========================================
@@ -290,7 +345,7 @@ const UIManager = {
     // ========================================
     // 釣り画面: ゲージバトル（インライン）
     // ========================================
-    showGaugeBattle(fish, redZoneWidth) {
+    showGaugeBattle(fish, redZoneWidth, info = null) {
         this.redZoneWidth = redZoneWidth;
 
         const fishingArea = document.getElementById('fishing-area');
@@ -304,13 +359,29 @@ const UIManager = {
         const greenStart1 = centerStart - this.greenZoneWidth;
         const greenStart2 = centerStart + redZoneWidth;
 
+        // 相手の強さと、ゾーンごとの捕獲率（どこを狙うべきかを一目で）
+        const pct = v => `${Math.round(v * 100)}%`;
+        const phaseDots = info && info.phases > 1
+            ? `<div class="rg-phase-dots">${Array.from({ length: info.phases }, (_, i) =>
+                `<span class="${i < info.phase ? 'on' : ''}"></span>`).join('')}</div>`
+            : '';
+        const header = info ? `
+                <div class="rg-battle-info">
+                    <div class="rg-battle-rank"><span class="rarity-${fish.rarity}">${fish.rarity}ランク</span>の魚</div>
+                    <div class="rg-matchup rg-matchup-${info.matchup.id}">${info.matchup.label}</div>
+                    <div class="rg-battle-power">自分 ${info.power} ／ 魚 ${fish.power}</div>
+                    ${phaseDots}
+                </div>` : '';
+        const rates = info ? `
+                <div class="rg-zone-rates">
+                    <span class="rg-zone-red">赤 ${pct(info.rates.red)}</span>
+                    <span class="rg-zone-green">緑 ${pct(info.rates.green)}</span>
+                    <span class="rg-zone-white">白 ${pct(info.rates.white)}</span>
+                </div>` : '';
+
         fishingArea.innerHTML = `
             <div class="gauge-battle">
-                <h2 class="gauge-battle-title">キャッチング中！</h2>
-                <div class="fish-info">
-                    <span class="fish-name rarity-${fish.rarity}"></span>
-                    <span class="fish-power">${fish.power}</span>
-                </div>
+                ${header}
                 <div class="gauge-container">
                     <div class="gauge-bar">
                         <div class="zone white-zone"></div>
@@ -320,6 +391,7 @@ const UIManager = {
                         <div class="gauge-indicator" id="gauge-indicator"></div>
                     </div>
                 </div>
+                ${rates}
                 <div class="gauge-instruction">タイミングよくクリック！</div>
             </div>
         `;
@@ -364,7 +436,7 @@ const UIManager = {
     // ========================================
     // 釣り上げ成功
     // ========================================
-    showCatchSuccess(fish, onClose, count = 1, extraRewards = [], earned = fish.price) {
+    showCatchSuccess(fish, onClose, count = 1, extraRewards = [], earned = fish.price, options = {}) {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
@@ -435,22 +507,23 @@ const UIManager = {
                             </div>
                         </div>
 
+                        ${options.comboBonus > 0 ? `<div class="rg-combo-line">コンボ +${Math.round(options.comboBonus * 100)}%</div>` : ''}
                         ${extraRewardsHtml}
                     </div>
                     
-                    <div class="tap-hint">TAP TO CLOSE</div>
+                    <div class="tap-hint">${options.autoClose ? 'TAP TO SKIP' : 'TAP TO CLOSE'}</div>
                 </div>
             </div>
         `;
 
-        // クリックとスペースキーで閉じる
-        this.setupResultOverlayClose(onClose);
+        // 通常の釣果は自動で閉じる（称号付き・スキル獲得のときはタップ待ち）
+        this.setupResultOverlayClose(onClose, options.autoClose ? 1500 : 0);
     },
 
     // ========================================
     // 釣り上げ失敗
     // ========================================
-    showCatchFailed(fish, onClose) {
+    showCatchFailed(fish, onClose, reason = '') {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
@@ -472,6 +545,7 @@ const UIManager = {
                             <span class="fish-name-small">${fish.name}</span> は<br>
                             力強く逃げ去ってしまった...
                         </p>
+                        ${reason ? `<p class="rg-fail-reason">${reason}</p>` : ''}
                     </div>
                     
                     <div class="tap-hint">TAP TO CLOSE</div>
@@ -479,51 +553,48 @@ const UIManager = {
             </div>
         `;
 
-        // クリックとスペースキーで閉じる
-        this.setupResultOverlayClose(onClose);
+        // 理由を読める時間だけ出して自動で閉じる
+        this.setupResultOverlayClose(onClose, 2000);
     },
 
     // ========================================
     // 結果オーバーレイのクローズ処理
     // ========================================
-    setupResultOverlayClose(onClose) {
+    setupResultOverlayClose(onClose, autoCloseMs = 0) {
         const overlay = document.getElementById('result-overlay');
         if (!overlay) return;
 
-        let handleKeydown;
+        let closed = false;
+        let autoTimer = null;
 
-        // クローズ処理
-        const closeOverlay = () => {
-            overlay.remove();
-            if (handleKeydown) {
-                document.removeEventListener('keydown', handleKeydown);
-            }
-            // コールバックを実行
-            if (typeof onClose === 'function') {
-                onClose();
-            }
-        };
-
-        handleKeydown = (e) => {
+        const handleKeydown = (e) => {
             if (e.code === 'Space' || e.key === ' ') {
                 e.preventDefault();
                 closeOverlay();
             }
         };
 
-        // 誤操作防止の遅延（500ms）
+        // 二重に閉じないようにする（自動クローズとタップが重なる場合）
+        const closeOverlay = () => {
+            if (closed) return;
+            closed = true;
+            clearTimeout(autoTimer);
+            overlay.remove();
+            document.removeEventListener('keydown', handleKeydown);
+            if (typeof onClose === 'function') onClose();
+        };
+
+        if (autoCloseMs > 0) autoTimer = setTimeout(closeOverlay, autoCloseMs);
+
+        // 誤操作防止の遅延（自動クローズ時は短め）
         setTimeout(() => {
-            // クリックで閉じる
-            overlay.addEventListener('click', (e) => {
+            overlay.addEventListener('pointerdown', (e) => {
                 e.stopPropagation();
                 closeOverlay();
             });
-
-            // スペースキーで閉じる
             document.addEventListener('keydown', handleKeydown);
-        }, 500);
+        }, autoCloseMs > 0 ? 250 : 500);
     },
-
     // ========================================
     // 空のビジュアルを更新
     // ========================================
