@@ -589,6 +589,43 @@ const BAITS = [
         description: 'Sランクが釣れやすい。',
         price: 3000,
         quantity: 5
+    },
+    // --- 特殊餌（釣り宿に1種だけ並ぶ。ランク違いではなく使いどころが違う） ---
+    {
+        id: 'bait_neri',
+        short: '逃げられても減らない',
+        name: '練り餌',
+        label: '練',
+        special: 'neri',
+        rank: 'C',
+        description: '逃げられても減らない（釣れたときだけ1つ使う）。Cランク中心',
+        price: 0,
+        quantity: 1
+    },
+    {
+        id: 'bait_maki',
+        short: '次の3投 待ち半分・2匹+30%',
+        name: 'まき餌',
+        label: '撒',
+        special: 'maki',
+        rank: 'D',
+        description: '投げると次の3投の待ち時間が半分、2匹釣り+30%。この餌では釣れない',
+        price: 0,
+        quantity: 1,
+        chum: { casts: 3, effects: [{ type: 'wait_time_reduction', value: 0.5 }, { type: 'multi_catch_2', value: 0.3 }] }
+    },
+    {
+        id: 'bait_glow',
+        short: '称号10倍・宝箱+10%',
+        name: '光る餌',
+        label: '光',
+        special: 'glow',
+        rank: 'D',                 // 実際のランクはそのラウンドの支給餌と同じ（rankFromSupply）
+        rankFromSupply: true,
+        description: '称号付きが10倍出やすく、宝箱+10%。ランクは支給餌と同じ',
+        price: 0,
+        quantity: 1,
+        effects: [{ type: 'title_boost', value: 10 }, { type: 'treasure_boost', value: 0.1 }]
     }
 ];
 
@@ -953,7 +990,7 @@ const FUELS = [
 const ROGUE_CONFIG = {
     // --- ラウンド ---
     finalRound: 10,                 // このラウンドをクリアすると航海達成（以降はエンドレス）
-    targets: [100, 300, 800, 2000, 4500, 8500, 14000, 20000, 27000, 36000], // 各ラウンドの目標水揚げ額(G)
+    targets: [100, 300, 800, 2000, 4500, 9000, 16000, 26000, 38000, 52000], // 各ラウンドの目標水揚げ額(G)
     endlessGrowth: 1.3,             // 最終ラウンド以降の目標の伸び率
     baitPerRound: 10,               // 毎ラウンド支給される餌の数
     // 支給される餌のランク（from 以降のラウンドで適用。後ろの定義が優先）
@@ -1042,6 +1079,40 @@ const ROGUE_CONFIG = {
         { id: 'bait_s', quantity: 3, price: 1200, stock: 3, fromRound: 6 }
     ],
 
+    // --- 竿のタイプ（素材 × タイプ。素材は RODS の5段階、タイプは個性） ---
+    // effects はその竿を持っている間だけ装備される見えないスキルとして扱う
+    rodMaterials: ['木', '竹', 'カーボン', 'チタン', '伝説'],
+    rodTypes: [
+        {
+            id: 'all', name: '万能竿', priceMult: 0.8,
+            description: '特別な効果はない。値段が2割安い',
+            effects: []
+        },
+        {
+            id: 'strong', name: '剛竿', priceMult: 1.0,
+            description: 'パワー+20%。ゲージが15%速い',
+            effects: [{ type: 'overdrive', power: 0.2, speed: 0.15 }]
+        },
+        {
+            id: 'soft', name: '軟竿', priceMult: 1.0,
+            description: '赤ゾーンの幅+30%。パワー-15%',
+            effects: [{ type: 'red_zone_boost', value: 0.3 }, { type: 'overdrive', power: -0.15, speed: 0 }]
+        },
+        {
+            id: 'quick', name: '早竿', priceMult: 1.0,
+            description: '待ち時間-30%。コンボの上限+2（最大+70%）。パワー-10%',
+            effects: [{ type: 'wait_time_reduction', value: 0.3 }, { type: 'overdrive', power: -0.1, speed: 0 }],
+            comboStacks: 2
+        },
+        {
+            id: 'probe', name: '探り竿', priceMult: 1.0,
+            description: '宝箱の出現率+5%、称号付きの出現率2倍。売値-10%',
+            effects: [{ type: 'treasure_boost', value: 0.05 }, { type: 'title_boost', value: 2 }, { type: 'price_boost', value: -0.1 }]
+        }
+    ],
+    startRodChoices: 3,             // 釣り旅の開始時に選べる竿の数（万能竿＋ランダム）
+    rodOfferChoices: 2,             // 釣り宿の竿の棚に並ぶ、次の素材の竿の数
+
     // --- 竿（ローグライト版の価格表。原作の RODS.price / upgradeCosts は使わない） ---
     rodPrices: [0, 500, 2000, 6000, 18000],
     rodUpgradeCosts: [
@@ -1056,38 +1127,164 @@ const ROGUE_CONFIG = {
     skyByRound: ['sky_default', 'sky_default', 'sky_sunset', 'sky_sunset', 'sky_night', 'sky_night',
         'sky_cherry', 'sky_storm', 'sky_aurora', 'sky_galaxy'],
 
-    // --- 海域（港で2つ提示され、選んだ方へ出航する） ---
-    // effects はその海域にいる間だけ装備される見えないスキルとして扱う
-    areaChoices: 2,
-    areas: [
+    // --- 天候（釣り宿で釣り場ごとにランダムで決まる。旧「海域」の効果） ---
+    // effects はその天候の間だけ装備される見えないスキルとして扱う
+    // tags は釣り場カードに出す短い説明（good: 得なら true）
+    weathers: [
         {
-            id: 'calm', name: '穏やかな湾', icon: 'beach_access', sky: 'sky_default', targetMult: 0.8,
+            id: 'clear', name: '晴れ', prefix: '', icon: 'wb_sunny', sky: null, targetMult: 1.0,
+            description: '特別な効果はない', effects: [], tags: []
+        },
+        {
+            id: 'calm', name: '凪', prefix: '凪の', icon: 'beach_access', sky: 'sky_default', targetMult: 0.8,
             description: 'ゲージが遅い。報酬スキルの選択肢が1つ減る',
-            effects: [{ type: 'gauge_slow', value: 0.2 }], rewardChoicesDelta: -1
+            effects: [{ type: 'gauge_slow', value: 0.2 }], rewardChoicesDelta: -1,
+            tags: [{ text: 'ゲージ遅い', good: true }, { text: '報酬-1', good: false }]
         },
         {
-            id: 'offshore', name: '沖合', icon: 'sailing', sky: null, targetMult: 1.0,
-            description: '特別な効果はない', effects: []
-        },
-        {
-            id: 'storm', name: '嵐の海', icon: 'thunderstorm', sky: 'sky_storm', targetMult: 1.2,
+            id: 'storm', name: '嵐', prefix: '嵐の', icon: 'thunderstorm', sky: 'sky_storm', targetMult: 1.2,
             description: 'ゲージが速い。魚の売値+30%',
-            effects: [{ type: 'gauge_slow', value: -0.25 }, { type: 'price_boost', value: 0.3 }]
+            effects: [{ type: 'gauge_slow', value: -0.25 }, { type: 'price_boost', value: 0.3 }],
+            tags: [{ text: '売値+30%', good: true }, { text: 'ゲージ速い', good: false }]
         },
         {
-            id: 'cove', name: '宝の入り江', icon: 'diamond', sky: 'sky_sunset', targetMult: 1.0,
+            id: 'treasure', name: 'お宝日和', prefix: '宝眠る', icon: 'diamond', sky: 'sky_sunset', targetMult: 1.0,
             description: '宝箱の出現率+15%。魚の売値-30%',
-            effects: [{ type: 'treasure_boost', value: 0.15 }, { type: 'price_boost', value: -0.3 }]
+            effects: [{ type: 'treasure_boost', value: 0.15 }, { type: 'price_boost', value: -0.3 }],
+            tags: [{ text: '宝箱+15%', good: true }, { text: '売値-30%', good: false }]
         },
         {
-            id: 'moon', name: '月夜の海', icon: 'nightlight', sky: 'sky_night', targetMult: 1.1,
+            id: 'moon', name: '月夜', prefix: '月夜の', icon: 'nightlight', sky: 'sky_night', targetMult: 1.1,
             description: '月のフィーバーゲージが4から始まる。待ち時間+30%',
-            effects: [{ type: 'wait_time_reduction', value: -0.3 }], startFever: { type: 'moon', value: 4 }
+            effects: [{ type: 'wait_time_reduction', value: -0.3 }], startFever: { type: 'moon', value: 4 },
+            tags: [{ text: '月フィーバー間近', good: true }, { text: '待ち長い', good: false }]
         },
         {
-            id: 'school', name: '群れの潮', icon: 'waves', sky: 'sky_cherry', targetMult: 1.0,
+            id: 'school', name: '群れ', prefix: '群れ来る', icon: 'waves', sky: 'sky_cherry', targetMult: 1.0,
             description: '2匹釣りの確率+30%。餌より上のランクが出ない',
-            effects: [{ type: 'multi_catch_2', value: 0.3 }], noUpperRank: true
+            effects: [{ type: 'multi_catch_2', value: 0.3 }], noUpperRank: true,
+            tags: [{ text: '2匹釣り+30%', good: true }, { text: '大物なし', good: false }]
+        }
+    ],
+
+    // --- 水域と釣り場（水域はラウンドで決まり、釣り宿でその水域の釣り場を1つ選ぶ） ---
+    //   fish: その釣り場でよく釣れる魚（同じランクの中で出やすさが favoredWeight 倍）
+    //   rankBoost: ランクの出やすさの上乗せ（海溝の深海魚など）
+    //   water: 釣り画面の水の色（水面, 水底）
+    // --- スキルの系統（設計書5.5）。同じ系統を2つ・4つ装備するとボーナス ---
+    // types: その系統に入る効果の種類。rodType: その竿を持っていると1つ分に数える
+    // bonus2 / bonus4 の effects は「見えないスキル」として混ぜる
+    families: [
+        {
+            id: 'might', name: '剛腕', icon: 'fitness_center', rodType: 'strong',
+            types: ['power_boost', 'overdrive', 'big_game_boost', 'count_skill_power'],
+            bonus2: { text: 'パワー+15%', effects: [{ type: 'overdrive', power: 0.15, speed: 0 }] },
+            bonus4: { text: 'パワーが魚の1.5倍以上なら必ず2匹', effects: [{ type: 'family_overpower_double', ratio: 1.5 }] }
+        },
+        {
+            id: 'skill', name: '技巧', icon: 'my_location', rodType: 'soft',
+            types: ['gauge_slow', 'red_zone_boost', 'second_chance', 'perfect_catch', 'master_needle', 'hit_window_mult', 'nibble_fix', 'auto_hit'],
+            bonus2: { text: '赤ゾーンの幅+20%', effects: [{ type: 'red_zone_boost', value: 0.2 }] },
+            bonus4: { text: '赤ゾーンで止めると餌が減らない', effects: [{ type: 'family_red_bait_save' }] }
+        },
+        {
+            id: 'trade', name: '商売', icon: 'payments', rodType: null,
+            types: ['price_boost', 'high_risk_sell', 'shop_discount', 'upgrade_discount'],
+            bonus2: { text: '売値+15%', effects: [{ type: 'price_boost', value: 0.15 }] },
+            bonus4: { text: '釣り宿の入れ替えが毎回1回無料', effects: [{ type: 'family_free_reroll', value: 1 }] }
+        },
+        {
+            id: 'treasure', name: '宝探し', icon: 'card_giftcard', rodType: 'probe',
+            types: ['treasure_boost', 'treasure_quantity', 'treasure_quality', 'magnet', 'title_boost', 'boat_event_boost', 'bird_event_boost'],
+            bonus2: { text: '宝箱の出現率+5%', effects: [{ type: 'treasure_boost', value: 0.05 }] },
+            bonus4: { text: '宝箱のお金が2倍', effects: [{ type: 'family_treasure_money', value: 2 }] }
+        },
+        {
+            id: 'sky', name: '天体', icon: 'auto_awesome', rodType: null,
+            types: ['fever_charge', 'fever_long', 'fever_bias_sun', 'fever_bias_moon', 'moon_rare_up', 'sun_chest_up', 'fever_treasure_boost', 'eternal_mania', 'cosmic_blessing'],
+            bonus2: { text: 'ラウンド開始時にフィーバーゲージ+2', effects: [{ type: 'family_fever_start', value: 2 }] },
+            bonus4: { text: 'フィーバー中は餌が減らない', effects: [{ type: 'family_fever_bait_save' }] }
+        },
+        {
+            id: 'school', name: '群れ', icon: 'waves', rodType: 'quick',
+            types: ['multi_catch_2', 'multi_catch_3', 'bait_save', 'rare_boost', 'rank_collector', 'wait_time_reduction', 'quick_hit_penalty', 'catch_boost'],
+            bonus2: { text: '2匹釣りの確率+10%', effects: [{ type: 'multi_catch_2', value: 0.1 }] },
+            bonus4: { text: 'コンボの上限+5（最大+100%）', effects: [{ type: 'family_combo_stacks', value: 5 }] }
+        }
+    ],
+
+    // --- ヌシ戦（設計書5.6） ---
+    // このラウンドは目標額に加えて「ヌシを1匹釣り上げる」がクリア条件
+    nushi: {
+        rounds: [3, 6, 9, 10],      // ヌシが出るラウンド
+        fromCast: 6,               // 何投目からかかり始めるか（逃げられても次の一投でまたかかる）
+        phases: 3,                 // ゲージバトルの連戦数（勝った分は逃げられても残る＝ヌシの体力）
+        speedStep: 0.15,           // 連戦ごとのゲージ速度の上昇
+        powerMult: 1.5,            // ヌシは元の魚よりパワーが高い
+        priceMult: 3,              // 売値（称号付きの10倍だと目標額を1匹で超えてしまうので抑える）
+        rewardChoices: 3           // 釣ると特別スキルを3択から1つ
+    },
+
+    // --- 特殊餌（設計書5.7）。釣り宿に1種だけ並ぶ ---
+    // price はそのラウンドの目標額に対する割合（序盤も終盤も同じ重さにする）
+    specialBaits: [
+        { id: 'bait_neri', quantity: 3, priceRate: 0.12 },
+        { id: 'bait_maki', quantity: 2, priceRate: 0.10 },
+        { id: 'bait_glow', quantity: 2, priceRate: 0.15 }
+    ],
+
+    // --- 釣り旅をまたぐ解禁（設計書5.8）。図鑑の登録数か到達ラウンドで解禁 ---
+    unlocks: [
+        { kind: 'rod', id: 'soft', label: '軟竿', need: { fish: 5 } },
+        { kind: 'rod', id: 'quick', label: '早竿', need: { round: 3 } },
+        { kind: 'rod', id: 'probe', label: '探り竿', need: { fish: 12 } },
+        { kind: 'bait', id: 'bait_maki', label: 'まき餌', need: { fish: 8 } },
+        { kind: 'bait', id: 'bait_glow', label: '光る餌', need: { round: 5 } }
+    ],
+
+    // --- 荒波レベル（釣り旅達成後に選べる高難度）。レベルごとに条件が1つ増える ---
+    ascension: [
+        { level: 1, text: '目標額+15%', targetMult: 0.15 },
+        { level: 2, text: '支給される餌-1', supplyDelta: -1 },
+        { level: 3, text: '釣り宿の餌の在庫-1', stockDelta: -1 },
+        { level: 4, text: '目標額さらに+15%', targetMult: 0.15 },
+        { level: 5, text: '報酬スキルの選択肢-1', rewardDelta: -1 }
+    ],
+
+    favoredWeight: 3,
+    highValueMult: 2,               // 「本日の高値」の魚の売値倍率
+    regions: [
+        {
+            id: 'village', name: '里の水辺', from: 1, water: ['#4f9d7e', '#1f4d3c'],
+            spots: [
+                { id: 'paddy', name: '田んぼ', fish: ['fish_d9', 'fish_d8', 'fish_d5'] },
+                { id: 'brook', name: '小川', fish: ['fish_d1', 'fish_d3', 'fish_d7'] },
+                { id: 'pond', name: 'ため池', fish: ['fish_d2', 'fish_d4', 'fish_d6'] }
+            ]
+        },
+        {
+            id: 'river', name: '川と湖', from: 4, water: ['#3d8fc4', '#1b4a72'],
+            spots: [
+                { id: 'stream', name: '渓流', fish: ['fish_c2', 'fish_c3', 'fish_c1'] },
+                { id: 'lake', name: '湖', fish: ['fish_c6', 'fish_c7', 'fish_c4'] },
+                { id: 'midstream', name: '中流', fish: ['fish_c8', 'fish_c5'] }
+            ]
+        },
+        {
+            id: 'coast', name: '沿岸', from: 7, water: ['#3b82f6', '#1e3a8a'],
+            spots: [
+                { id: 'pier', name: '堤防', fish: ['fish_b7', 'fish_b4', 'fish_b5'] },
+                { id: 'rocks', name: '磯', fish: ['fish_b1', 'fish_b2'] },
+                { id: 'rip', name: '潮目', fish: ['fish_b6', 'fish_b3'] }
+            ]
+        },
+        {
+            id: 'ocean', name: '外洋', from: 10, water: ['#2563eb', '#0b1a4a'],
+            spots: [
+                { id: 'offshore', name: '沖', fish: ['fish_a1', 'fish_a2', 'fish_a5'] },
+                { id: 'deep', name: '深場', fish: ['fish_a4', 'fish_a3', 'fish_a6'] },
+                { id: 'trench', name: '海溝', fish: ['fish_s3', 'fish_s1', 'fish_s2'], rankBoost: { S: 0.05 } }
+            ]
         }
     ]
 };

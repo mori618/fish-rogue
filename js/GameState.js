@@ -1,5 +1,5 @@
 // ゲーム状態管理
-// 1回の航海（ラン）中のプレイヤー状態を一元管理する。
+// 1回の釣り旅（ラン）中のプレイヤー状態を一元管理する。
 // ラウンド進行そのものは RunManager が担当する。
 
 const GameState = {
@@ -14,14 +14,15 @@ const GameState = {
     rank: 1,
 
     // ========================================
-    // 航海（ラン）の進行状況
+    // 釣り旅（ラン）の進行状況
     // ========================================
     run: null,  // { round, target, earned, phase, offers, ... } 詳細は RunManager.createRun
 
     // ========================================
     // 釣り竿の状態
     // ========================================
-    rodRankIndex: 0,
+    rodRankIndex: 0,      // 竿の素材（RODS のインデックス）
+    rodType: 'all',       // 竿のタイプ（ROGUE_CONFIG.rodTypes の id）
     rodStarLevels: {},  // 竿インデックスごとの星数 { 0: 2, 1: 0 }
     unlockedRods: [0],
     equippedSkills: [],
@@ -47,12 +48,12 @@ const GameState = {
     gachaTickets: 0,
 
     // ========================================
-    // 図鑑（航海をまたいで引き継ぐ）
+    // 図鑑（釣り旅をまたいで引き継ぐ）
     // ========================================
     encyclopedia: {},
 
     // ========================================
-    // この航海の統計
+    // この釣り旅の統計
     // ========================================
     totalFishCaught: 0,
     caughtByRank: { 'D': 0, 'C': 0, 'B': 0, 'A': 0, 'S': 0, 'SS': 0 },
@@ -71,7 +72,7 @@ const GameState = {
 
     // ========================================
     // 初期化
-    // saveData があれば中断した航海を復元、なければ新しい航海用にリセット
+    // saveData があれば中断した釣り旅を復元、なければ新しい釣り旅用にリセット
     // ========================================
     init(saveData = null) {
         const s = saveData || {};
@@ -83,6 +84,7 @@ const GameState = {
         this.run = s.run ? JSON.parse(JSON.stringify(s.run)) : null;
 
         this.rodRankIndex = s.rodRankIndex || 0;
+        this.rodType = s.rodType || 'all';
         this.rodStarLevels = { 0: 0, ...(s.rodStarLevels || {}) };
         this.unlockedRods = [...(s.unlockedRods || [0])];
         this.equippedSkills = [...(s.equippedSkills || [])];
@@ -94,7 +96,7 @@ const GameState = {
         this.inventory = [];
         this.gachaTickets = 0;
 
-        // 図鑑は航海をまたぐメタデータから読む
+        // 図鑑は釣り旅をまたぐメタデータから読む
         this.encyclopedia = { ...SaveManager.loadMeta().encyclopedia };
 
         this.totalFishCaught = s.totalFishCaught || 0;
@@ -166,22 +168,63 @@ const GameState = {
         }
     },
 
-    // 魚1匹あたりの売値（スキル・海域・コンボ補正込み）
+    // 魚1匹あたりの売値（スキル・天候・コンボ・本日の高値の補正込み）
     getSalePrice(fish) {
-        return Math.floor(fish.price * (1 + this.getPriceBonus()) * (1 + this.getComboBonus()));
+        // 本日の高値の魚は売値が上がる
+        const highValue = this.run && this.run.highValue === fish.id ? GAME_DATA.ROGUE_CONFIG.highValueMult : 1;
+        return Math.floor(fish.price * highValue * (1 + this.getPriceBonus()) * (1 + this.getComboBonus()));
     },
 
     // 連続成功コンボによる売値ボーナス（0.1 = +10%）
     getComboBonus() {
         if (!this.run) return 0;
         const cfg = GAME_DATA.ROGUE_CONFIG.combo;
-        return Math.min(this.run.combo || 0, cfg.maxStacks) * cfg.step;
+        return Math.min(this.run.combo || 0, this.getComboMaxStacks()) * cfg.step;
     },
 
-    // 今いる海域（ラウンド中のみ）
-    getCurrentArea() {
-        if (!this.run || !this.run.area) return null;
-        return GAME_DATA.ROGUE_CONFIG.areas.find(a => a.id === this.run.area) || null;
+    // コンボの上限（早竿で増える）
+    getComboMaxStacks() {
+        let stacks = GAME_DATA.ROGUE_CONFIG.combo.maxStacks + (this.getRodType().comboStacks || 0);
+        this.getEffectsByType('family_combo_stacks').forEach(e => { stacks += e.value; });
+        return stacks;
+    },
+
+    // ========================================
+    // 竿のタイプ
+    // ========================================
+    getRodType(typeId = this.rodType) {
+        const types = GAME_DATA.ROGUE_CONFIG.rodTypes;
+        return types.find(t => t.id === typeId) || types[0];
+    },
+
+    // 「竹の剛竿」のような表示名
+    getRodDisplayName(rodIndex = this.rodRankIndex, typeId = this.rodType) {
+        return `${GAME_DATA.ROGUE_CONFIG.rodMaterials[rodIndex]}の${this.getRodType(typeId).name}`;
+    },
+
+    // ========================================
+    // 水域・釣り場・天候（ラウンド中のみ）
+    // ========================================
+    getCurrentRegion() {
+        if (!this.run || !this.run.region) return null;
+        return GAME_DATA.ROGUE_CONFIG.regions.find(r => r.id === this.run.region) || null;
+    },
+
+    getCurrentSpot() {
+        const region = this.getCurrentRegion();
+        if (!region) return null;
+        return region.spots.find(s => s.id === this.run.spot) || null;
+    },
+
+    getCurrentWeather() {
+        if (!this.run || !this.run.weather) return null;
+        return GAME_DATA.ROGUE_CONFIG.weathers.find(w => w.id === this.run.weather) || null;
+    },
+
+    // 「嵐の堤防」のような釣り場の表示名
+    getSpotDisplayName(spot = this.getCurrentSpot(), weather = this.getCurrentWeather()) {
+        if (!spot) return '';
+        return `${weather ? weather.prefix : ''}${spot.name}`;
     },
 
     // ========================================
@@ -219,8 +262,17 @@ const GameState = {
     },
 
     // 餌を1つ消費する。成功時のみ「餌の達人」で消費を免れることがある
-    useBait(isSuccess = true) {
+    //   opts.redStop: ゲージの赤ゾーンで止めた一投か（技巧4つの効果）
+    useBait(isSuccess = true, opts = {}) {
         if (this.getBaitCount(this.baitType) <= 0) return false;
+
+        // 練り餌: 逃げられても減らない
+        const bait = this.getBaitData();
+        if (!isSuccess && bait && bait.special === 'neri') return true;
+
+        // 天体4つ: フィーバー中は減らない / 技巧4つ: 赤で止めたら減らない
+        if (this.fever.isActive && this.getEffectsByType('family_fever_bait_save').length > 0) return true;
+        if (opts.redStop && this.getEffectsByType('family_red_bait_save').length > 0) return true;
 
         if (isSuccess && Math.random() < this.getBaitSaveChance()) {
             console.log('✨ 餌の達人発動！');
@@ -231,24 +283,72 @@ const GameState = {
         return true;
     },
 
+    // 今選んでいる餌のデータ
+    getBaitData(baitId = this.baitType) {
+        return GAME_DATA.BAITS.find(b => b.id === baitId) || null;
+    },
+
+    // 魚の抽選に使う餌のランク（光る餌はそのラウンドの支給餌と同じ）
+    getBaitRank(bait) {
+        if (!bait) return 'D';
+        if (bait.rankFromSupply && this.run && this.run.supply) {
+            const supply = GAME_DATA.BAITS.find(b => b.id === this.run.supply.id);
+            if (supply) return supply.rank;
+        }
+        return bait.rank;
+    },
+
+    // ========================================
+    // スキルの系統（設計書5.5）
+    // ========================================
+    getSkillFamily(skillId) {
+        const skill = this.getSkillData(skillId);
+        if (!skill || !skill.effect) return null;
+        const effect = skill.effect.type === 'hybrid' && skill.effect.effects ? skill.effect.effects[0] : skill.effect;
+        return GAME_DATA.ROGUE_CONFIG.families.find(f => f.types.includes(effect.type)) || null;
+    },
+
+    // 系統ごとの装備数。竿のタイプも1つ分に数える
+    getFamilyCounts(equipped = this.equippedSkills, rodType = this.rodType) {
+        const counts = {};
+        GAME_DATA.ROGUE_CONFIG.families.forEach(f => { counts[f.id] = f.rodType === rodType ? 1 : 0; });
+        equipped.forEach(id => {
+            const family = this.getSkillFamily(id);
+            if (family) counts[family.id]++;
+        });
+        return counts;
+    },
+
+    // 発動している系統ボーナスの効果
+    getFamilyBonusEffects() {
+        const counts = this.getFamilyCounts();
+        const effects = [];
+        GAME_DATA.ROGUE_CONFIG.families.forEach(f => {
+            if (counts[f.id] >= 2) effects.push(...f.bonus2.effects);
+            if (counts[f.id] >= 4) effects.push(...f.bonus4.effects);
+        });
+        return effects;
+    },
+
     // ========================================
     // 釣り竿（購入・強化）
     // 価格は ROGUE_CONFIG.rodPrices / rodUpgradeCosts
     // ========================================
-    getRodPrice(rodIndex) {
-        const base = GAME_DATA.ROGUE_CONFIG.rodPrices[rodIndex];
+    getRodPrice(rodIndex, typeId = 'all') {
+        const base = GAME_DATA.ROGUE_CONFIG.rodPrices[rodIndex] * this.getRodType(typeId).priceMult;
         return Math.floor(base * (1.0 - this.getShopDiscount()));
     },
 
     // 次の竿に買い替える（買ったらそのまま持ち替える）
-    buyNextRod() {
+    buyNextRod(typeId) {
         const nextIndex = this.rodRankIndex + 1;
         if (!GAME_DATA.RODS[nextIndex]) return false;
-        if (!this.spendMoney(this.getRodPrice(nextIndex))) return false;
+        if (!this.spendMoney(this.getRodPrice(nextIndex, typeId))) return false;
 
         this.unlockedRods.push(nextIndex);
         this.rodStarLevels[nextIndex] = 0;
         this.rodRankIndex = nextIndex;
+        this.rodType = typeId;
         return true;
     },
 
@@ -1008,10 +1108,26 @@ const GameState = {
 
             this._collectEffects(skill.effect, type, effects);
         }
-        // 海域の効果は「その海域にいる間だけ装備される見えないスキル」として混ぜる
-        const area = this.getCurrentArea();
-        if (area) {
-            area.effects.forEach(effect => this._collectEffects(effect, type, effects));
+        // 竿のタイプの効果は「その竿を持っている間だけ装備される見えないスキル」として混ぜる
+        this.getRodType().effects.forEach(effect => this._collectEffects(effect, type, effects));
+
+        // 天候の効果は「その天候の間だけ装備される見えないスキル」として混ぜる
+        const weather = this.getCurrentWeather();
+        if (weather) {
+            weather.effects.forEach(effect => this._collectEffects(effect, type, effects));
+        }
+
+        // 系統ボーナス
+        this.getFamilyBonusEffects().forEach(effect => this._collectEffects(effect, type, effects));
+
+        // 今の餌の効果（光る餌）と、まき餌の残り効果（釣り中のみ）
+        if (this.run && this.run.phase === 'fishing') {
+            const bait = this.getBaitData();
+            if (bait && bait.effects) bait.effects.forEach(effect => this._collectEffects(effect, type, effects));
+            if (this.run.chum > 0) {
+                const maki = GAME_DATA.BAITS.find(b => b.special === 'maki');
+                maki.chum.effects.forEach(effect => this._collectEffects(effect, type, effects));
+            }
         }
         return effects;
     },

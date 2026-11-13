@@ -7,6 +7,7 @@ const UIManager = {
     // ========================================
     currentScreen: 'start',  // start, fishing, harbor, encyclopedia
     lastMoney: null,
+    holdRunPanel: false,   // 釣果カード表示中は進捗バーを止め、金額が飛んできてから伸ばす
 
     // ========================================
     // ゲージバトル設定
@@ -18,6 +19,15 @@ const UIManager = {
     // 画面切り替え
     // ========================================
     showScreen(screenId) {
+        // 釣り場 ⇔ 釣り宿の行き来は波で区切る（0.5秒）
+        const from = this.currentScreen;
+        if ((from === 'fishing' && screenId === 'harbor') || (from === 'harbor' && screenId === 'fishing')) {
+            this.playWaveTransition();
+        }
+
+        // 前の画面の案内は持ち越さない
+        document.querySelectorAll('.rg-tip, .notification-banner').forEach(el => el.remove());
+
         document.querySelectorAll('.screen').forEach(screen => {
             screen.classList.remove('active');
         });
@@ -29,15 +39,30 @@ const UIManager = {
             document.body.dataset.screen = screenId;
         }
 
+        // 竿の描画ループと波の音は釣り画面にいる間だけ動かす
+        if (screenId !== 'fishing') {
+            RodAnimator.stop();
+            SoundManager.stopAmbient();
+        } else {
+            SoundManager.startAmbient();
+        }
+
         // 画面固有の初期化
         if (screenId === 'start') {
             this.initStartScreen();
         } else if (screenId === 'fishing') {
+            RodAnimator.start();
             this.showIdle();
             this.updateStatus();
             this.updateSkyVisuals();
+            // 下部HUDの中身が入って高さが決まってから、竿の位置を合わせる
+            RodAnimator.resize();
         } else if (screenId === 'harbor') {
             HarborUI.render();
+            // 到着演出が終わってから案内を出す
+            setTimeout(() => {
+                if (this.currentScreen === 'harbor') this.showTip('inn', '釣り宿：報酬を選ぶ → 買い物 → 下の釣り場カードを押して出発');
+            }, 3000);
         } else if (screenId === 'encyclopedia') {
             EncyclopediaManager.render();
         }
@@ -52,13 +77,79 @@ const UIManager = {
             continueBtn.classList.toggle('hidden', !SaveManager.hasSaveData());
         }
 
+        this.updateSoundButtons();
+
+        // 背景にゆっくり揺れる竿（最高記録に応じて素材が上がる）
+        const startScreen = document.getElementById('start-screen');
+        if (startScreen && !startScreen.querySelector('.rg-title-rod')) {
+            const best = SaveManager.loadMeta().bestRound;
+            const rodIndex = Math.min(4, Math.floor(best / 3));
+            const rod = document.createElement('div');
+            rod.className = 'rg-title-rod';
+            rod.innerHTML = RodAnimator.previewSvg('all', rodIndex);
+            startScreen.appendChild(rod);
+        }
+
         const record = document.getElementById('start-record');
         if (record) {
             const meta = SaveManager.loadMeta();
-            record.textContent = meta.totalRuns > 0
-                ? `最高記録: ラウンド${meta.bestRound} クリア${meta.clears > 0 ? ` ／ 航海達成 ${meta.clears}回` : ''}`
-                : '';
+            const unlocked = RunManager.getUnlocked(meta);
+            const total = GAME_DATA.FISH.length;
+            const rows = [];
+            rows.push(`<div class="rg-record-row"><span class="material-icons">menu_book</span>図鑑 <strong>${unlocked.fishCount} / ${total}</strong></div>`);
+            if (meta.totalRuns > 0) {
+                rows.push(`<div class="rg-record-row"><span class="material-icons">military_tech</span>最高 <strong>R${meta.bestRound}クリア</strong>${meta.clears > 0 ? `・達成${meta.clears}回` : ''}</div>`);
+            }
+            if (meta.lastRun) {
+                rows.push(`<div class="rg-record-row"><span class="material-icons">history</span>前回 <strong>R${meta.lastRun.round}</strong>で終了・${meta.lastRun.earned.toLocaleString()} G</div>`);
+            }
+            // 次の解禁
+            const next = RunManager.config.unlocks.find(u => !(u.kind === 'rod' ? unlocked.rods : unlocked.baits).includes(u.id));
+            if (next) {
+                rows.push(`<div class="rg-record-row rg-record-next"><span class="material-icons">lock</span>次の解禁: ${next.label}（${RunManager.unlockNeedText(next)}）</div>`);
+            }
+            record.innerHTML = rows.join('');
         }
+    },
+
+    // 初めての釣り旅の案内（同じ案内は一度だけ）
+    showTip(key, text) {
+        const meta = SaveManager.loadMeta();
+        if (meta.tutorial[key]) return;
+        SaveManager.markTutorial(key);
+        document.querySelectorAll('.rg-tip').forEach(el => el.remove());
+        const tip = document.createElement('div');
+        tip.className = `rg-tip rg-tip-${key}`;
+        tip.innerHTML = `<span class="material-icons">lightbulb</span><span>${text}</span>`;
+        tip.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            tip.remove();
+        });
+        document.body.appendChild(tip);
+        setTimeout(() => tip.classList.add('rg-hide'), 4200);
+        setTimeout(() => tip.remove(), 4600);
+    },
+
+    playWaveTransition() {
+        document.querySelectorAll('.rg-wave-transition').forEach(el => el.remove());
+        const wave = document.createElement('div');
+        wave.className = 'rg-wave-transition';
+        wave.innerHTML = '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H70 Q78 12 70 25 T70 50 T70 75 T70 100 H0 Z"/></svg>';
+        document.body.appendChild(wave);
+        setTimeout(() => wave.remove(), 600);
+    },
+
+    // 効果音のオン／オフ表示（タイトルと装備画面のボタン）
+    updateSoundButtons() {
+        document.querySelectorAll('.rg-sound-btn').forEach(btn => {
+            btn.innerHTML = `<span class="material-icons">${SoundManager.enabled ? 'volume_up' : 'volume_off'}</span> 効果音 ${SoundManager.enabled ? 'オン' : 'オフ'}`;
+        });
+    },
+
+    toggleSound() {
+        SoundManager.unlock();
+        SoundManager.toggle();
+        this.updateSoundButtons();
     },
 
     // ========================================
@@ -96,6 +187,8 @@ const UIManager = {
             : document.getElementById('money-display');
         if (!target || !target.parentElement) return;
 
+        if (diff > 0) SoundManager.play('coin', { combo: GameState.run ? GameState.run.combo : 0 });
+
         const popup = document.createElement('span');
         popup.className = `rg-money-popup ${diff > 0 ? 'plus' : 'minus'}`;
         popup.textContent = `${diff > 0 ? '+' : ''}${diff.toLocaleString()}`;
@@ -105,14 +198,29 @@ const UIManager = {
     // ラウンドと目標の進み具合
     updateRunPanel() {
         const run = GameState.run;
-        if (!run) return;
+        if (!run || this.holdRunPanel) return;
 
         const label = document.getElementById('round-label');
         const text = document.getElementById('round-progress-text');
         const bar = document.getElementById('round-progress-bar');
         const progress = document.getElementById('round-progress');
         if (label) label.textContent = `R${run.round}`;
-        if (text) text.textContent = `${run.earned.toLocaleString()}/${run.target.toLocaleString()}`;
+
+        // 達成前は「あと○G」。達成後は次の評価までの残り
+        if (text) {
+            if (!run.reached && run.earned >= run.target && (!run.nushi || run.nushi.caught)) {
+                text.textContent = '目標達成！';
+            } else if (!run.reached && run.earned >= run.target && run.nushi && !run.nushi.caught) {
+                text.textContent = 'ヌシを釣れ！';
+            } else if (!run.reached) {
+                text.textContent = `あと ${Math.max(0, run.target - run.earned).toLocaleString()} G`;
+            } else {
+                const next = [...GAME_DATA.ROGUE_CONFIG.grades].reverse().find(g => run.earned < run.target * g.rate);
+                text.textContent = next
+                    ? `${next.name}まで ${Math.ceil(run.target * next.rate - run.earned).toLocaleString()} G`
+                    : '評価 金';
+            }
+        }
 
         // 達成前は目標までのバー。達成後は目標の2倍までに伸ばし、銀・金の目盛りを出す
         const scale = run.reached ? run.target * 2 : run.target;
@@ -128,9 +236,101 @@ const UIManager = {
 
         const returnBtn = document.getElementById('return-btn');
         if (returnBtn) returnBtn.classList.toggle('hidden', !(run.reached && run.phase === 'fishing'));
+
+        this.updateRunWarning();
     },
 
-    // パワー以外のチップ（コンボ・海域）
+    // 餌が残り少ないのに目標に届いていないとき、残りの投数と1投あたりの必要額を出し、画面の縁を赤くする
+    updateRunWarning() {
+        const run = GameState.run;
+        const warning = document.getElementById('run-warning');
+        const screen = document.getElementById('fishing-screen');
+        if (!run || !warning || !screen) return;
+
+        const casts = GameState.getTotalBaitCount();
+        const need = run.target - run.earned;
+        const danger = run.phase === 'fishing' && !run.reached && casts > 0 && casts <= 5;
+        warning.classList.toggle('hidden', !danger);
+        screen.classList.toggle('rg-danger', danger);
+        if (danger) {
+            warning.textContent = need <= 0
+                ? `残り${casts}投・ヌシがまだ（${run.nushi.name}）`
+                : `残り${casts}投・あと${need.toLocaleString()}G（1投あたり${Math.ceil(need / casts).toLocaleString()}G）`;
+        }
+    },
+
+    // 目標達成: バーが光って緑に変わり、「宿へ戻る」が右下から出てくる
+    celebrateGoal() {
+        const progress = document.getElementById('round-progress');
+        if (progress) {
+            progress.classList.remove('rg-flash');
+            void progress.offsetWidth;
+            progress.classList.add('rg-flash');
+        }
+        const returnBtn = document.getElementById('return-btn');
+        if (returnBtn) {
+            returnBtn.classList.remove('rg-slide-in');
+            void returnBtn.offsetWidth;
+            returnBtn.classList.add('rg-slide-in');
+        }
+    },
+
+    // 金額の文字を、釣果カードの位置から進捗バーまで飛ばす
+    flyEarnedToBar(text, onArrive) {
+        const from = document.querySelector('#result-overlay .rg-earned-value');
+        const to = document.getElementById('round-progress');
+        if (!from || !to) {
+            onArrive();
+            return;
+        }
+        const a = from.getBoundingClientRect();
+        const b = to.getBoundingClientRect();
+        const fly = document.createElement('div');
+        fly.className = 'rg-fly-amount';
+        fly.textContent = text;
+        fly.style.left = `${a.left + a.width / 2}px`;
+        fly.style.top = `${a.top + a.height / 2}px`;
+        document.body.appendChild(fly);
+        requestAnimationFrame(() => {
+            fly.style.transform = `translate(${b.left + b.width / 2 - (a.left + a.width / 2)}px, ${b.top + b.height / 2 - (a.top + a.height / 2)}px) scale(0.6)`;
+            fly.style.opacity = '0.2';
+        });
+        setTimeout(() => {
+            fly.remove();
+            onArrive();
+        }, 480);
+    },
+
+    // 釣り上げた瞬間、ウキの位置で「×3」が弾ける
+    popCombo(combo) {
+        if (combo < 2) return;
+        const screen = document.getElementById('fishing-screen');
+        const bob = RodAnimator.bobber;
+        if (!screen || !bob) return;
+        const pop = document.createElement('div');
+        pop.className = 'rg-combo-pop';
+        pop.textContent = `×${combo}`;
+        pop.style.left = `${bob.x}px`;
+        pop.style.top = `${bob.y - 30}px`;
+        screen.appendChild(pop);
+        setTimeout(() => pop.remove(), 900);
+    },
+
+    // コンボが途切れた: チップが割れて落ちる
+    breakCombo(combo) {
+        const chip = document.getElementById('combo-chip');
+        if (!chip || combo < 2) return;
+        const shard = chip.cloneNode(true);
+        shard.removeAttribute('id');
+        shard.classList.remove('hidden');
+        shard.classList.add('rg-chip-break');
+        const rect = chip.getBoundingClientRect();
+        shard.style.left = `${rect.left}px`;
+        shard.style.top = `${rect.top}px`;
+        document.body.appendChild(shard);
+        setTimeout(() => shard.remove(), 800);
+    },
+    // パワー以外のチップ（コンボ・釣り場）
     updateChips() {
         const run = GameState.run;
         if (!run) return;
@@ -142,12 +342,61 @@ const UIManager = {
             combo.textContent = `×${run.combo} +${Math.round(bonus * 100)}%`;
         }
 
-        const areaChip = document.getElementById('area-chip');
-        const area = GameState.getCurrentArea();
-        if (areaChip && area) {
-            areaChip.innerHTML = `<span class="material-icons">${area.icon}</span><span>${area.name}</span>`;
-            areaChip.title = area.description;
+        // ヌシ: まだなら「ヌシ」、釣ったら「ヌシ済」
+        const nushiChip = document.getElementById('nushi-chip');
+        if (nushiChip) {
+            nushiChip.classList.toggle('hidden', !run.nushi);
+            if (run.nushi) {
+                nushiChip.classList.toggle('rg-done', run.nushi.caught);
+                nushiChip.innerHTML = `<span class="material-icons">${run.nushi.caught ? 'check_circle' : 'emoji_events'}</span>`;
+                nushiChip.title = `ヌシ：${run.nushi.name}${run.nushi.caught ? '（釣った）' : ''}`;
+                nushiChip.setAttribute('aria-label', nushiChip.title);
+            }
         }
+
+        // まき餌の残り投数
+        const chumChip = document.getElementById('chum-chip');
+        if (chumChip) {
+            chumChip.classList.toggle('hidden', !(run.chum > 0));
+            chumChip.textContent = `撒×${run.chum || 0}`;
+        }
+
+        const areaChip = document.getElementById('area-chip');
+        const weather = GameState.getCurrentWeather();
+        if (areaChip && weather) {
+            areaChip.innerHTML = `<span class="material-icons">${weather.icon}</span><span>${GameState.getSpotDisplayName()}</span>`;
+            areaChip.title = weather.description;
+        }
+    },
+
+    // ラウンド開始: 画面中央に「ROUND 3 嵐の堤防」を1秒ほど出す
+    showRoundIntro() {
+        const run = GameState.run;
+        if (!run) return;
+        const region = GameState.getCurrentRegion();
+        const weather = GameState.getCurrentWeather();
+        const highValue = GAME_DATA.FISH.find(f => f.id === run.highValue);
+        const supply = GAME_DATA.BAITS.find(b => b.id === run.supply.id);
+
+        document.querySelectorAll('.rg-round-intro').forEach(el => el.remove());
+        const intro = document.createElement('div');
+        intro.className = 'rg-round-intro';
+        intro.innerHTML = `
+            <div class="rg-intro-region">${region ? region.name : ''}</div>
+            <div class="rg-intro-round">ROUND ${run.round}</div>
+            <div class="rg-intro-spot">${GameState.getSpotDisplayName()}</div>
+            <div class="rg-intro-detail">目標 ${run.target.toLocaleString()} G ／ ${supply.name}×${run.supply.count}</div>
+            ${highValue ? `<div class="rg-intro-detail">本日の高値: ${highValue.name}</div>` : ''}
+            ${run.nushi ? `<div class="rg-intro-nushi">ヌシ戦：${run.nushi.name}を釣り上げろ</div>` : ''}
+            ${weather && weather.tags.length ? `<div class="rg-intro-tags">${weather.tags.map(t => `<span class="rg-tag ${t.good ? 'good' : 'bad'}">${t.text}</span>`).join('')}</div>` : ''}
+        `;
+        intro.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            intro.remove();
+        });
+        document.getElementById('fishing-screen').appendChild(intro);
+        setTimeout(() => intro.classList.add('hide'), 1600);
+        setTimeout(() => intro.remove(), 2100);
     },
     // 餌セレクター（所持している餌の切り替えと残り数）
     updateBaitInfo() {
@@ -161,7 +410,7 @@ const UIManager = {
             const selected = bait.id === GameState.baitType;
             return `
                 <button class="rg-bait-slot ${selected ? 'selected' : ''}" onclick="UIManager.selectBait('${bait.id}')" aria-label="${bait.name} ${count}個">
-                    <span class="rg-bait-rank rarity-${bait.rank}">${bait.rank}</span>
+                    <span class="rg-bait-rank ${bait.special ? 'rg-bait-special' : `rarity-${bait.rank}`}">${bait.label || bait.rank}</span>
                     <span class="rg-bait-count ${count <= 1 ? 'rg-low' : ''}">×${count}</span>
                 </button>
             `;
@@ -187,39 +436,22 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        fishingArea.innerHTML = `
-            <div class="idle-state">
-                <div class="instruction">画面をタップしてキャスト</div>
-            </div>
-        `;
+        // 「タップでキャスト」の案内は最初の3投だけ。以降は海と竿だけを見せる
+        const firstCasts = SaveManager.loadMeta().casts < 3;
+        fishingArea.innerHTML = firstCasts
+            ? `<div class="idle-state"><div class="instruction">画面をタップしてキャスト</div></div>`
+            : '';
 
-        // 1人称視点の釣り竿を待機状態に
         this.updateRodView('idle');
         this.hideGauge();
     },
-
     // ========================================
     // 釣り竿の状態更新
     // ========================================
-    updateRodView(state) {
-        const rodView = document.getElementById('fishing-rod-view');
-        if (!rodView) return;
-
-        rodView.className = 'fishing-rod-view';
-        if (state) {
-            rodView.classList.add(state);
-        }
-
-        // スキル色を適用
-        const skin = GameState.getCurrentSkin();
-        const rodShaft = rodView.querySelector('.rod-shaft');
-        if (rodShaft) {
-            rodShaft.style.backgroundColor = skin.rodColor;
-            // 枠線の色も少し暗くして調整（簡易的）
-            rodShaft.style.borderColor = skin.rodColor;
-        }
+    updateRodView(state, options = {}) {
+        // 竿・糸・ウキの描画は RodAnimator が担当する。ここは状態名を渡すだけ
+        RodAnimator.setState(state || 'idle', options);
     },
-
     // ========================================
     // 釣り画面: キャスト
     // ========================================
@@ -227,39 +459,21 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        fishingArea.innerHTML = `
-            <div class="casting-state">
-                <div class="instruction">キャスト中...</div>
-            </div>
-        `;
-
+        // キャスト中は文字を出さず、竿の振りとウキの飛ぶ様子を見せる
+        fishingArea.innerHTML = '';
         this.updateRodView('casting');
     },
-
     // ========================================
     // 釣り画面: 待機（ウキ静止）
     // ========================================
     showWaiting() {
+        this.showTip('hit', 'ウキが揺れても待つ。沈んだ瞬間にタップして合わせよう');
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        const skin = GameState.getCurrentSkin();
-
-        fishingArea.innerHTML = `
-            <div class="waiting-state">
-                <div class="water-surface">
-                    <div class="bobber waiting">
-                        <div class="bobber-stick"></div>
-                        <div class="bobber-body" style="background-color: ${skin.bobberColor}"></div>
-                    </div>
-                    <div class="ripple"></div>
-                </div>
-            </div>
-        `;
-
+        fishingArea.innerHTML = '';
         this.updateRodView('waiting');
     },
-
     // ========================================
     // 釣り画面: 予兆（ウキ揺れ）
     // ========================================
@@ -267,39 +481,17 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        const skin = GameState.getCurrentSkin();
-
-        fishingArea.innerHTML = `
-            <div class="nibble-state">
-                <div class="water-surface">
-                    <div class="bobber">
-                        <div class="bobber-stick"></div>
-                        <div class="bobber-body" style="background-color: ${skin.bobberColor}"></div>
-                    </div>
-                    <div class="ripple active" style="transform: scale(${scale});"></div>
-                </div>
-            </div>
-        `;
-
+        fishingArea.innerHTML = '';
+        // 沈みの深さと魚影の大きさに使う（餌より上のランクの魚ほど大きい）
+        this.nibbleScale = scale;
         this.updateRodView('nibble');
     },
-
     // ========================================
     // ウキの揺れを1回分実行
     // ========================================
-    triggerBobberShake(durationMs) {
-        const bobber = document.querySelector('.bobber');
-        if (!bobber) return;
-
-        // アニメーションをリセットして実行
-        bobber.classList.remove('nibbling');
-        void bobber.offsetWidth; // 強制リフロー
-
-        bobber.style.animationDuration = `${durationMs / 1000}s`;
-        bobber.style.animationIterationCount = '1';
-        bobber.classList.add('nibbling');
+    triggerBobberShake() {
+        RodAnimator.nibble(this.nibbleScale || 1);
     },
-
     // ========================================
     // 釣り画面: ヒット
     // ========================================
@@ -307,21 +499,9 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        const skin = GameState.getCurrentSkin();
-
-        fishingArea.innerHTML = `
-            <div class="hit-state">
-                <div class="water-surface">
-                    <div class="bobber sinking">
-                        <div class="bobber-stick"></div>
-                        <div class="bobber-body" style="background-color: ${skin.bobberColor}"></div>
-                    </div>
-                    <div class="splash"></div>
-                </div>
-            </div>
-        `;
-
-        this.updateRodView('hit');
+        fishingArea.innerHTML = '';
+        const fish = FishingGame.currentFish;
+        this.updateRodView('hit', { rarity: fish ? fish.rarity : 'D' });
 
         // 画面シェイクとバイブレーションを発生させる
         this.shakeScreen();
@@ -329,7 +509,6 @@ const UIManager = {
             navigator.vibrate([100]); // 100msのバイブレーション
         }
     },
-
     // ========================================
     // 画面を一時的に揺らす（スクリーンシェイク）
     // ========================================
@@ -346,13 +525,17 @@ const UIManager = {
     // 釣り画面: ゲージバトル（インライン）
     // ========================================
     showGaugeBattle(fish, redZoneWidth, info = null) {
+        this.showTip('gauge', '動く印を赤ゾーンで止めると一番釣れる。各ゾーンの数字が捕獲率');
         this.redZoneWidth = redZoneWidth;
 
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        // 竿をバトル状態（奮闘中）にする
-        this.updateRodView('battle');
+        // 竿をバトル状態にする（力関係で、しなりの強さと竿先の震えが変わる）
+        this.updateRodView('battle', {
+            rarity: fish.rarity,
+            matchup: info ? info.matchup.id : 'even'
+        });
 
         // ゾーンの位置を計算（中央に赤ゾーン）
         const centerStart = (100 - redZoneWidth) / 2;
@@ -367,16 +550,10 @@ const UIManager = {
             : '';
         const header = info ? `
                 <div class="rg-battle-info">
-                    <div class="rg-battle-rank"><span class="rarity-${fish.rarity}">${fish.rarity}ランク</span>の魚</div>
+                    <div class="rg-battle-rank">${fish.isNushi ? `<span class="rg-nushi-tag">ヌシ</span> ${fish.name}` : `<span class="rarity-${fish.rarity}">${fish.rarity}ランク</span>の魚`}</div>
                     <div class="rg-matchup rg-matchup-${info.matchup.id}">${info.matchup.label}</div>
                     <div class="rg-battle-power">自分 ${info.power} ／ 魚 ${fish.power}</div>
                     ${phaseDots}
-                </div>` : '';
-        const rates = info ? `
-                <div class="rg-zone-rates">
-                    <span class="rg-zone-red">赤 ${pct(info.rates.red)}</span>
-                    <span class="rg-zone-green">緑 ${pct(info.rates.green)}</span>
-                    <span class="rg-zone-white">白 ${pct(info.rates.white)}</span>
                 </div>` : '';
 
         fishingArea.innerHTML = `
@@ -384,15 +561,15 @@ const UIManager = {
                 ${header}
                 <div class="gauge-container">
                     <div class="gauge-bar">
-                        <div class="zone white-zone"></div>
-                        <div class="zone green-zone" style="left: ${greenStart1}%; width: ${this.greenZoneWidth}%;"></div>
-                        <div class="zone red-zone" style="left: ${centerStart}%; width: ${redZoneWidth}%;"></div>
-                        <div class="zone green-zone" style="left: ${greenStart2}%; width: ${this.greenZoneWidth}%;"></div>
+                        <div class="zone white-zone">${info ? `<span class="rg-zone-label rg-left">${pct(info.rates.white)}</span><span class="rg-zone-label rg-right">${pct(info.rates.white)}</span>` : ''}</div>
+                        <div class="zone green-zone" style="left: ${greenStart1}%; width: ${this.greenZoneWidth}%;">${info ? `<span class="rg-zone-label">${pct(info.rates.green)}</span>` : ''}</div>
+                        <div class="zone red-zone" style="left: ${centerStart}%; width: ${redZoneWidth}%;">${info ? `<span class="rg-zone-label">${pct(info.rates.red)}</span>` : ''}</div>
+                        <div class="zone green-zone" style="left: ${greenStart2}%; width: ${this.greenZoneWidth}%;">${info ? `<span class="rg-zone-label">${pct(info.rates.green)}</span>` : ''}</div>
                         <div class="gauge-indicator" id="gauge-indicator"></div>
                     </div>
+                    <div class="rg-stop-label" id="gauge-stop-label"></div>
                 </div>
-                ${rates}
-                <div class="gauge-instruction">タイミングよくクリック！</div>
+                <div class="gauge-instruction">赤で止めろ！</div>
             </div>
         `;
     },
@@ -404,6 +581,20 @@ const UIManager = {
         const indicator = document.getElementById('gauge-indicator');
         if (indicator) {
             indicator.style.left = `${position}%`;
+        }
+        // 針が赤ゾーンに近いほど竿が大きくしなる
+        RodAnimator.setGauge(position);
+    },
+
+    // ゲージを止めた瞬間: 針が光り、止めたゾーンの名前を出す
+    showGaugeStop(zone) {
+        const indicator = document.getElementById('gauge-indicator');
+        const label = document.getElementById('gauge-stop-label');
+        if (indicator) indicator.classList.add('rg-stopped', `rg-stopped-${zone}`);
+        if (label) {
+            label.textContent = { red: '赤！', green: '緑', white: '白…' }[zone];
+            label.className = `rg-stop-label show rg-stop-${zone}`;
+            label.style.left = indicator ? indicator.style.left : '50%';
         }
     },
 
@@ -455,6 +646,7 @@ const UIManager = {
                 if (reward.type === 'money') icon = 'paid';
                 else if (reward.type === 'skill') icon = 'auto_fix_high';
                 else if (reward.type === 'bait') icon = 'set_meal';
+                else if (reward.type === 'nushi') icon = 'emoji_events';
                 
                 return `
                     <div class="extra-reward-pill">
@@ -475,7 +667,7 @@ const UIManager = {
         }
 
         fishingArea.innerHTML = `
-            <div class="result-overlay success" id="result-overlay">
+            <div class="result-overlay success rg-light-dim" id="result-overlay" style="--from-x: ${RodAnimator.layout ? RodAnimator.layout.water.x : 0}px; --from-y: ${RodAnimator.layout ? RodAnimator.layout.water.y : 0}px;">
                 <div class="result-card rarity-${fish.rarity}">
                     <div class="card-header">NEW CATCH!</div>
                     
@@ -503,7 +695,7 @@ const UIManager = {
                             </div>
                             <div class="stat-item">
                                 <span class="label">水揚げ</span>
-                                <span class="value">+${earned.toLocaleString()} G</span>
+                                <span class="value rg-earned-value">+${earned.toLocaleString()} G</span>
                             </div>
                         </div>
 
@@ -516,14 +708,26 @@ const UIManager = {
             </div>
         `;
 
+        // 閉じるときに金額が上部の進捗バーへ飛び、着いたらバーが伸びる
+        this.holdRunPanel = true;
+        const closeWithFly = () => {
+            this.flyEarnedToBar(`+${earned.toLocaleString()} G`, () => {
+                this.holdRunPanel = false;
+                this.updateRunPanel();
+            });
+            if (typeof onClose === 'function') onClose();
+        };
+
         // 通常の釣果は自動で閉じる（称号付き・スキル獲得のときはタップ待ち）
-        this.setupResultOverlayClose(onClose, options.autoClose ? 1500 : 0);
+        this.setupResultOverlayClose(closeWithFly, options.autoClose ? 1500 : 0);
     },
 
     // ========================================
     // 釣り上げ失敗
     // ========================================
     showCatchFailed(fish, onClose, reason = '') {
+        this.updateRodView('fail');
+
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
@@ -624,7 +828,12 @@ const UIManager = {
         // Original was #87CEEB 0%, #3b82f6 30%. It was a smooth transition from sky to light blue ocean.
         // To keep the sky distinct but connected:
 
-        const newGradient = `linear-gradient(180deg, ${skyTop} 0%, ${skyBottom} 30%, #1e3a8a 100%)`;
+        // 水の色と岸辺の景色は水域ごとに変える（池の緑、川の青、沿岸、外洋の紺）
+        const region = GameState.getCurrentRegion();
+        const water = region ? region.water : ['#3b82f6', '#1e3a8a'];
+        fishingScreen.dataset.region = region ? region.id : '';
+
+        const newGradient = `linear-gradient(180deg, ${skyTop} 0%, ${skyBottom} 29.5%, ${water[0]} 30%, ${water[1]} 100%)`;
 
         fishingScreen.style.background = newGradient;
     },
@@ -709,8 +918,8 @@ const UIManager = {
                 <div class="missed-text">${message}</div>
             </div>
         `;
+        this.updateRodView('fail');
     },
-
     // ========================================
     // 釣り竿情報更新
     // ========================================
@@ -868,10 +1077,16 @@ const UIManager = {
     // ========================================
     // 一時メッセージ表示 (廃止 -> showNotificationへ)
     // ========================================
-    showMessage(message, duration = 3000) {
-        this.showNotification('INFO', message, 'info', duration);
+    showMessage(message, duration = 1500) {
+        // 小さなメッセージは画面下の短いトースト（通知バナーはフィーバーとイベント専用）
+        document.querySelectorAll('.rg-toast').forEach(el => el.remove());
+        const toast = document.createElement('div');
+        toast.className = 'rg-toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('hide'), Math.max(600, duration - 300));
+        setTimeout(() => toast.remove(), duration);
     },
-
     // ========================================
     // 通知バナー表示 (New!)
     // ========================================

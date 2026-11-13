@@ -137,7 +137,9 @@ const FishingGame = {
             };
         }
 
-        const bait = GAME_DATA.BAITS.find(b => b.id === GameState.baitType) || GAME_DATA.BAITS[0]; // デフォルトD
+        // 光る餌などはランクがラウンドで変わるので、抽選用のランクに置き換えたコピーを使う
+        const baseBait = GAME_DATA.BAITS.find(b => b.id === GameState.baitType) || GAME_DATA.BAITS[0]; // デフォルトD
+        const bait = { ...baseBait, rank: GameState.getBaitRank(baseBait) };
 
         // 餌ごとのランク出現重み設定 (ユーザー要望に基づく)
         // ... (既存コメント)
@@ -207,9 +209,17 @@ const FishingGame = {
             currentWeights = { ...(feverWeights[bait.rank] || feverWeights['D']) };
         }
 
-        // 海域「群れの潮」: 餌より上のランクは出ない
-        const area = GameState.getCurrentArea();
-        if (area && area.noUpperRank) {
+        // 釣り場のランクの上乗せ（海溝の深海魚など）
+        const spot = GameState.getCurrentSpot();
+        if (spot && spot.rankBoost) {
+            Object.entries(spot.rankBoost).forEach(([rank, w]) => {
+                currentWeights[rank] = (currentWeights[rank] || 0) + w;
+            });
+        }
+
+        // 天候「群れ」: 餌より上のランクは出ない
+        const weather = GameState.getCurrentWeather();
+        if (weather && weather.noUpperRank) {
             Object.keys(currentWeights).forEach(rank => {
                 if (this.RANK_INDEX[rank] > this.RANK_INDEX[bait.rank]) delete currentWeights[rank];
             });
@@ -296,8 +306,11 @@ const FishingGame = {
         const rareBonus = GameState.getRareBonus();
 
         // プールの各魚に重みを適用
+        const favored = spot ? spot.fish : [];
         const weightedPool = fishPool.map(f => {
             let effectiveWeight = f.weight;
+            // 釣り場でよく釣れる魚
+            if (favored.includes(f.id)) effectiveWeight *= GAME_DATA.ROGUE_CONFIG.favoredWeight;
             // weight < 15 は「あまり釣れない」以下 (頻度プロパティ連携)
             if (rareBonus > 0 && f.weight < 15) {
                 // ボーナスを適用 (効果を実感しやすくするため係数を2.0とする)
@@ -380,7 +393,25 @@ const FishingGame = {
         }
         UIManager.updateBaitInfo();
 
+        // まき餌: 投げても魚はかからず、次の数投に効果が残る
+        const castBait = GameState.getBaitData();
+        if (castBait && castBait.special === 'maki') {
+            GameState.useBait(true);
+            GameState.run.chum = (GameState.run.chum || 0) + castBait.chum.casts;
+            SoundManager.play('cast');
+            UIManager.showMessage(`まき餌！ 次の${GameState.run.chum}投は待ち時間半分・2匹釣り+30%`, 1800);
+            GameState.ensureUsableBait();
+            UIManager.updateBaitInfo();
+            UIManager.updateStatus();
+            SaveManager.save();
+            RunManager.checkRoundEnd();
+            return true;
+        }
+
+        SaveManager.countCast();
         this.state = 'casting';
+        this.lastStopZone = null;
+        this.chumCast = (GameState.run.chum || 0) > 0;
         UIManager.showCasting();
 
         // ガチャモードならメッセージ上書き
@@ -389,8 +420,8 @@ const FishingGame = {
             if (area) area.querySelector('.instruction').textContent = 'ガチャ実行中...';
         }
 
-        // 魚を抽選
-        this.currentFish = this.selectFish();
+        // 魚を抽選（ヌシのラウンドで条件を満たせばヌシがかかる）
+        this.currentFish = RunManager.shouldHookNushi() ? RunManager.makeNushiFish() : this.selectFish();
         console.log('🐟 抽選された魚:', this.currentFish.name);
 
         // 待機時間を計算
@@ -580,7 +611,7 @@ const FishingGame = {
                 const feverResult = GameState.progressFever(true);
                 UIManager.updateFeverVisuals();
                 if (feverResult.message === 'end') {
-                    UIManager.showMessage('💨 フィーバー終了...', 3000);
+                    UIManager.showNotification('', 'フィーバー終了', 'cloud', 2000);
                 }
             }
 
@@ -632,7 +663,7 @@ const FishingGame = {
                 // バトルが発生するか先に判定
                 const playerPower = GameState.getTotalPower();
                 const fishPower = this.currentFish ? this.currentFish.power : 0;
-                const isForcedBattle = ['A', 'S', 'SS'].includes(this.currentFish.rarity);
+                const isForcedBattle = ['A', 'S', 'SS'].includes(this.currentFish.rarity) || this.currentFish.isNushi;
                 const willBattle = !(playerPower >= fishPower && !isForcedBattle);
 
                 if (willBattle) {
@@ -673,15 +704,15 @@ const FishingGame = {
 
         console.log(`⚡ パワー判定: プレイヤー ${playerPower} vs 魚 ${fishPower} (${this.currentFish.name})`);
 
-        // Aランク以上は強制的にバトル発生
-        const isForcedBattle = ['A', 'S', 'SS'].includes(this.currentFish.rarity);
+        // Aランク以上とヌシは強制的にバトル発生
+        const isForcedBattle = ['A', 'S', 'SS'].includes(this.currentFish.rarity) || this.currentFish.isNushi;
 
         if (playerPower >= fishPower && !isForcedBattle) {
             // 即座に釣り上げ成功
             this.catchSuccess();
         } else {
-            // ゲージバトルへ移行
-            this.battlePhase = 1;
+            // ゲージバトルへ移行（ヌシは前の一投で勝った連戦の続きから）
+            this.battlePhase = this.currentFish.isNushi ? (GameState.run.nushi.won || 0) + 1 : 1;
             this.startGaugeBattle(playerPower, fishPower);
         }
     },
@@ -705,6 +736,10 @@ const FishingGame = {
         // スキルによる減速
         const slowBonus = GameState.getGaugeSlowBonus();
         this.gaugeSpeed = config.baseSpeed * speedMultiplier * (1 - slowBonus);
+        // ヌシは連戦ごとに速くなる
+        if (this.currentFish.isNushi) {
+            this.gaugeSpeed *= 1 + GAME_DATA.ROGUE_CONFIG.nushi.speedStep * (this.battlePhase - 1);
+        }
 
         // 赤ゾーンの幅：パワー差が小さいほど広い
         let redZoneWidth = config.redZoneWidthMin +
@@ -716,7 +751,7 @@ const FishingGame = {
         redZoneWidth = Math.min(redZoneWidth, 40); // 最大幅を制限
 
         // UIにゲージを表示
-        const phases = ['S', 'SS'].includes(this.currentFish.rarity) ? 2 : 1;
+        const phases = this.getBattlePhases(this.currentFish);
         UIManager.showGaugeBattle(this.currentFish, redZoneWidth, {
             power: playerPower,
             matchup: this.getMatchup(this.currentFish, playerPower),
@@ -729,6 +764,12 @@ const FishingGame = {
         this.gaugePosition = 0;
         this.gaugeDirection = 1;
         this.animateGauge();
+    },
+
+    // ゲージバトルの連戦数（ヌシ3、S以上2、それ以外1）
+    getBattlePhases(fish) {
+        if (fish.isNushi) return GAME_DATA.ROGUE_CONFIG.nushi.phases;
+        return ['S', 'SS'].includes(fish.rarity) ? 2 : 1;
     },
 
     // ========================================
@@ -754,7 +795,7 @@ const FishingGame = {
     },
 
     // ========================================
-    // 捕獲率の計算（ゲージ表示・港の目安・判定で共通）
+    // 捕獲率の計算（ゲージ表示・釣り宿の目安・判定で共通）
     // ========================================
     // 対戦の格付け: 余裕 / 互角 / 格上 / 無謀
     getMatchup(fish, power = GameState.getTotalPower()) {
@@ -800,7 +841,7 @@ const FishingGame = {
         return ['S', 'SS'].includes(fish.rarity) ? one * one : one;  // S以上は2連戦
     },
 
-    // 餌1つで1匹釣れる確率の目安（港の表示用）
+    // 餌1つで1匹釣れる確率の目安（釣り宿の表示用）
     estimateBaitSuccess(baitId, power = GameState.getTotalPower()) {
         const bait = GAME_DATA.BAITS.find(b => b.id === baitId);
         const weights = this.SPAWN_WEIGHTS[bait.rank];
@@ -825,7 +866,10 @@ const FishingGame = {
         cancelAnimationFrame(this.gaugeAnimationId);
 
         let zone = UIManager.getGaugeZone(this.gaugePosition);
+        this.lastStopZone = zone;
         RunManager.recordZone(zone);
+        SoundManager.play('stop', { zone });
+        UIManager.showGaugeStop(zone);
 
         // 起死回生スキル: 白ゾーンを緑扱いにすることがある
         if (zone === 'white' && Math.random() < GameState.getSecondChanceRate()) {
@@ -856,10 +900,11 @@ const FishingGame = {
             UIManager.updateRodView('strike');
 
             if (Math.random() < catchRate) {
-                // S, SSランクは2連戦
-                if (['S', 'SS'].includes(this.currentFish.rarity) && this.battlePhase === 1) {
-                    this.battlePhase = 2;
-                    UIManager.showMessage('まだまだ！', 1000);
+                // S, SSランクは2連戦、ヌシは3連戦
+                if (this.currentFish.isNushi) GameState.run.nushi.won = this.battlePhase;
+                if (this.battlePhase < this.getBattlePhases(this.currentFish)) {
+                    this.battlePhase++;
+                    UIManager.showMessage(this.currentFish.isNushi ? `ヌシが暴れる！（${this.battlePhase}/${this.getBattlePhases(this.currentFish)}）` : 'まだまだ！', 1000);
                     setTimeout(() => {
                         this.startGaugeBattle(GameState.getTotalPower(), this.currentFish.power);
                     }, 1000);
@@ -886,17 +931,20 @@ const FishingGame = {
 
         const fish = this.currentFish;
 
+        // 竿を立てて、魚（宝箱）が水面から跳ねる
+        UIManager.updateRodView('success', { rarity: fish.rarity, treasure: !!fish.isTreasure });
+
         // 餌を消費
-        GameState.useBait(true);
+        GameState.useBait(true, { redStop: this.lastStopZone === 'red' });
         UIManager.updateBaitInfo();
 
         // フィーバー進行
         const feverResult = GameState.progressFever();
         UIManager.updateFeverVisuals();
         if (feverResult.message === 'start') {
-            UIManager.showMessage(`🔥 ${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
+            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
         } else if (feverResult.message === 'end') {
-            UIManager.showMessage('💨 フィーバー終了...', 3000);
+            UIManager.showNotification('', 'フィーバー終了', 'cloud', 2000);
         }
 
         // 宝箱の場合
@@ -921,6 +969,12 @@ const FishingGame = {
             catchCount += GameState.getMultiCatchBonusNum();
         }
 
+        // 剛腕4つ: パワーが魚を大きく上回れば必ず2匹
+        const overpower = GameState.getEffectsByType('family_overpower_double')[0];
+        if (overpower && GameState.getTotalPower() >= fish.power * overpower.ratio) {
+            catchCount = Math.max(catchCount, 2);
+        }
+
         // 太公望スキル: 釣果が常に2倍
         if (GameState.getEffectsByType('master_angler_special').length > 0) {
             catchCount *= 2;
@@ -937,10 +991,14 @@ const FishingGame = {
         const earned = GameState.getSalePrice(fish) * catchCount;
         GameState.addMoney(earned);
         RunManager.recordCatch();
+        UIManager.popCombo(GameState.run.combo);
 
         // 称号付き: ボーナスとしてTier2以上のスキルを1つ
         const drops = [];
-        if (fish.hasTitle) {
+        if (fish.isNushi) {
+            RunManager.onNushiCaught();
+            drops.push({ type: 'nushi', count: 1, name: '釣り宿で特別スキルを1つ選べます' });
+        } else if (fish.hasTitle) {
             const bonusSkill = RunManager.pickSkill({ minTier: 2 });
             if (bonusSkill) {
                 GameState.addSkill(bonusSkill.id);
@@ -970,7 +1028,7 @@ const FishingGame = {
             const feverResult = GameState.progressFever(true);
             UIManager.updateFeverVisuals();
             if (feverResult.message === 'end') {
-                UIManager.showMessage('💨 フィーバー終了...', 3000);
+                UIManager.showNotification('', 'フィーバー終了', 'cloud', 2000);
             }
         }
 
@@ -993,14 +1051,14 @@ const FishingGame = {
         this.state = 'result';
 
         // 餌を消費
-        GameState.useBait(false);
+        GameState.useBait(false, { redStop: this.lastStopZone === 'red' });
         UIManager.updateBaitInfo();
 
         // 失敗時は確定でフィーバーゲージ+1
         const feverResult = GameState.progressFever(true);
         UIManager.updateFeverVisuals();
         if (feverResult.message === 'start') {
-            UIManager.showMessage(`🔥 ${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
+            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
         }
 
         if (!skipPenalty) {
@@ -1024,6 +1082,9 @@ const FishingGame = {
     // ラウンドの決着（目標達成・餌切れ）を判定し、続行なら待機状態に戻る
     // ========================================
     endTurn(allowEvent = false) {
+        // まき餌の効果は魚がかかった一投ごとに1つ減る
+        if (this.chumCast && GameState.run && GameState.run.chum > 0) GameState.run.chum--;
+        this.chumCast = false;
         this.state = 'idle';
         this.currentFish = null;
         GameState.ensureUsableBait(); // 使い切った餌を選んだままにしない
@@ -1089,7 +1150,9 @@ const FishingGame = {
         const [minRate, maxRate] = GAME_DATA.ROGUE_CONFIG.treasureMoneyRate[type];
         const target = GameState.run ? GameState.run.target : 100;
         const baseMoney = Math.floor(target * (minRate + Math.random() * (maxRate - minRate)));
-        const finalMoney = Math.floor(baseMoney * quantityMult * qualityMult * feverMult);
+        let finalMoney = Math.floor(baseMoney * quantityMult * qualityMult * feverMult);
+        // 宝探し4つ: 宝箱のお金が2倍
+        GameState.getEffectsByType('family_treasure_money').forEach(e => { finalMoney *= e.value; });
 
         GameState.addMoney(finalMoney);
         results.push({ type: 'money', value: finalMoney, name: `${finalMoney.toLocaleString()} G` });
@@ -1299,7 +1362,7 @@ const FishingGame = {
                 console.log('⚡ 漁船効果: フィーバーチャージ');
 
                 if (result.message === 'start') {
-                    UIManager.showMessage(`🔥 ${result.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
+                    UIManager.showNotification('フィーバー開始！', `${result.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${result.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, result.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
                 }
             }
 

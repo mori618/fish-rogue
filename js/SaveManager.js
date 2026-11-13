@@ -1,15 +1,15 @@
 // セーブマネージャー
 // localStorage に2種類のデータを保存する
-//   - 航海データ: 進行中の航海（ラン）。ゲームオーバーで削除される
-//   - メタデータ: 図鑑と最高記録。航海をまたいで残る
+//   - 釣り旅データ: 進行中の釣り旅（ラン）。ゲームオーバーで削除される
+//   - メタデータ: 図鑑と最高記録。釣り旅をまたいで残る
 
 const SaveManager = {
     RUN_KEY: 'fish_rogue_run',
     META_KEY: 'fish_rogue_meta',
-    VERSION: 2,
+    VERSION: 3,
 
     // ========================================
-    // 航海データ
+    // 釣り旅データ
     // ========================================
     save(gameState = GameState) {
         const data = {
@@ -20,6 +20,7 @@ const SaveManager = {
             baitType: gameState.baitType,
             run: gameState.run,
             rodRankIndex: gameState.rodRankIndex,
+            rodType: gameState.rodType,
             rodStarLevels: { ...gameState.rodStarLevels },
             unlockedRods: [...gameState.unlockedRods],
             equippedSkills: [...gameState.equippedSkills],
@@ -35,7 +36,7 @@ const SaveManager = {
 
         const savedRun = this._write(this.RUN_KEY, data);
 
-        // 図鑑は釣るたびに増えるので、航海データと一緒にメタにも反映する
+        // 図鑑は釣るたびに増えるので、釣り旅データと一緒にメタにも反映する
         const meta = this.loadMeta();
         meta.encyclopedia = { ...gameState.encyclopedia };
         return this._write(this.META_KEY, meta) && savedRun;
@@ -68,11 +69,33 @@ const SaveManager = {
             encyclopedia: meta.encyclopedia || {},
             bestRound: meta.bestRound || 0,   // クリアした最大ラウンド
             totalRuns: meta.totalRuns || 0,
-            clears: meta.clears || 0          // 航海達成（最終ラウンドクリア）回数
+            clears: meta.clears || 0,         // 釣り旅達成（最終ラウンドクリア）回数
+            casts: meta.casts || 0,           // これまでに投げた回数（最初の案内に使う）
+            tutorial: meta.tutorial || {},    // 最初の釣り旅の案内を見たか { hit: true, ... }
+            lastRun: meta.lastRun || null     // 前回の釣り旅の結果 { round, cleared, earned }
         };
     },
 
-    // 航海の結果を記録する。最高記録を更新したら true
+    countCast() {
+        const meta = this.loadMeta();
+        meta.casts++;
+        this._write(this.META_KEY, meta);
+    },
+
+    setLastRun(result) {
+        const meta = this.loadMeta();
+        meta.lastRun = result;
+        this._write(this.META_KEY, meta);
+    },
+
+    // チュートリアルの案内を見たことを記録する
+    markTutorial(key) {
+        const meta = this.loadMeta();
+        meta.tutorial = { ...meta.tutorial, [key]: true };
+        this._write(this.META_KEY, meta);
+    },
+
+    // 釣り旅の結果を記録する。最高記録を更新したら true
     recordRun(clearedRounds, isNewRun = false, isClear = false) {
         const meta = this.loadMeta();
         const isBest = clearedRounds > meta.bestRound;

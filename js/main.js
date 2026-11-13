@@ -7,12 +7,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const on = (id, handler) => document.getElementById(id).addEventListener('click', handler);
 
+    // ブラウザは最初のタップまで音を出せないので、タップのたびに音声を有効にする（2回目以降は何もしない）
+    document.addEventListener('pointerdown', () => SoundManager.unlock(), true);
+
     // ========================================
     // スタート画面
     // ========================================
     on('start-btn', () => {
         if (SaveManager.hasSaveData() &&
-            !window.confirm('進行中の航海があります。破棄して新しく始めますか？')) {
+            !window.confirm('進行中の釣り旅があります。破棄して新しく始めますか？')) {
             return;
         }
         RunManager.startNewRun();
@@ -23,12 +26,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     on('encyclopedia-btn', () => {
-        // 航海を始める前でも図鑑を見られるよう、メタデータから読み込む
+        // 釣り旅を始める前でも図鑑を見られるよう、メタデータから読み込む
         GameState.encyclopedia = { ...SaveManager.loadMeta().encyclopedia };
         UIManager.showScreen('encyclopedia');
     });
 
     on('encyclopedia-back-btn', () => UIManager.showScreen('start'));
+    on('sound-btn', () => UIManager.toggleSound());
 
     // ========================================
     // 釣り画面
