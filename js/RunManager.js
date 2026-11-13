@@ -200,7 +200,8 @@ const RunManager = {
         const rank = order[Math.min(order.indexOf(supply.rank) + 1, order.length - 2)];
         const pool = GAME_DATA.FISH.filter(f => f.rarity === rank && f.specialTitle);
         const fish = pool[Math.floor(Math.random() * pool.length)];
-        return { fishId: fish.id, name: `${fish.specialTitle}${fish.name}`, caught: false };
+        // won: 勝った連戦の数（逃げられても残る＝ヌシの体力）
+        return { fishId: fish.id, name: `${fish.specialTitle}${fish.name}`, caught: false, won: 0 };
     },
 
     // この一投でヌシがかかるか（6投目以降、まだ釣っていなければ毎回）
@@ -219,7 +220,7 @@ const RunManager = {
             hasTitle: true,
             isNushi: true,
             power: Math.round(base.power * this.config.nushi.powerMult),
-            price: Math.floor(base.price * GAME_DATA.TITLE_CONFIG.priceMultiplier)
+            price: Math.floor(base.price * this.config.nushi.priceMult)
         };
     },
 

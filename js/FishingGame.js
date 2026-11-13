@@ -711,8 +711,8 @@ const FishingGame = {
             // 即座に釣り上げ成功
             this.catchSuccess();
         } else {
-            // ゲージバトルへ移行
-            this.battlePhase = 1;
+            // ゲージバトルへ移行（ヌシは前の一投で勝った連戦の続きから）
+            this.battlePhase = this.currentFish.isNushi ? (GameState.run.nushi.won || 0) + 1 : 1;
             this.startGaugeBattle(playerPower, fishPower);
         }
     },
@@ -901,6 +901,7 @@ const FishingGame = {
 
             if (Math.random() < catchRate) {
                 // S, SSランクは2連戦、ヌシは3連戦
+                if (this.currentFish.isNushi) GameState.run.nushi.won = this.battlePhase;
                 if (this.battlePhase < this.getBattlePhases(this.currentFish)) {
                     this.battlePhase++;
                     UIManager.showMessage(this.currentFish.isNushi ? `ヌシが暴れる！（${this.battlePhase}/${this.getBattlePhases(this.currentFish)}）` : 'まだまだ！', 1000);

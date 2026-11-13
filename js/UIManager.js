@@ -26,7 +26,7 @@ const UIManager = {
         }
 
         // 前の画面の案内は持ち越さない
-        document.querySelectorAll('.rg-tip').forEach(el => el.remove());
+        document.querySelectorAll('.rg-tip, .notification-banner').forEach(el => el.remove());
 
         document.querySelectorAll('.screen').forEach(screen => {
             screen.classList.remove('active');
