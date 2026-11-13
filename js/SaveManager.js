@@ -69,8 +69,17 @@ const SaveManager = {
             encyclopedia: meta.encyclopedia || {},
             bestRound: meta.bestRound || 0,   // クリアした最大ラウンド
             totalRuns: meta.totalRuns || 0,
-            clears: meta.clears || 0          // 釣り旅達成（最終ラウンドクリア）回数
+            clears: meta.clears || 0,         // 釣り旅達成（最終ラウンドクリア）回数
+            casts: meta.casts || 0,           // これまでに投げた回数（最初の案内に使う）
+            tutorial: meta.tutorial || {},    // 最初の釣り旅の案内を見たか { hit: true, ... }
+            lastRun: meta.lastRun || null     // 前回の釣り旅の結果 { round, cleared, earned }
         };
+    },
+
+    countCast() {
+        const meta = this.loadMeta();
+        meta.casts++;
+        this._write(this.META_KEY, meta);
     },
 
     // 釣り旅の結果を記録する。最高記録を更新したら true

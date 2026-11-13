@@ -73,10 +73,11 @@
                     <div id="round-mark-silver" class="rg-mark rg-mark-silver hidden"></div>
                     <div id="round-mark-gold" class="rg-mark rg-mark-gold hidden"></div>
                 </div>
-                <span id="round-progress-text" class="rg-progress-text">0/0</span>
-                <span class="rg-money"><span id="money-display">0 G</span></span>
+                <span id="round-progress-text" class="rg-progress-text">あと 0 G</span>
             </div>
+            <div id="run-warning" class="rg-run-warning hidden"></div>
             <div class="rg-chips">
+                <span class="rg-chip rg-chip-money"><span class="material-icons">paid</span><span id="money-display">0 G</span></span>
                 <span class="rg-chip"><span class="material-icons">phishing</span><span id="power-display">10 P</span></span>
                 <span id="combo-chip" class="rg-chip rg-chip-combo hidden"></span>
                 <span id="area-chip" class="rg-chip"></span>
@@ -97,20 +98,20 @@
         <!-- 竿・糸・ウキ・水面の演出（RodAnimator が描く） -->
         <svg id="rod-scene" class="rg-rod-scene" aria-hidden="true"></svg>
 
-        <!-- 下部HUD: 操作（装備・宿へ戻る・餌の選択）を親指の届く場所に -->
-        <div class="bottom-hud-center rg-hud-bottom">
-            <div class="rg-hud-actions">
-                <button id="build-btn" class="floating-btn btn-town rg-small-btn">
-                    <span class="material-icons">backpack</span>
-                    <span class="btn-label">装備</span>
-                </button>
+        <!-- 下部HUD: 装備（左下）・餌スロット（中央）・宿へ戻る（右下）を海の上に直接置く -->
+        <div class="rg-hud-bottom">
+            <button id="build-btn" class="floating-btn btn-town rg-small-btn">
+                <span class="material-icons">backpack</span>
+                <span class="btn-label">装備</span>
+            </button>
+            <div class="rg-hud-center">
+                <div id="bait-info" class="rg-bait-slots"></div>
                 <div id="bait-total" class="rg-bait-total"></div>
-                <button id="return-btn" class="floating-btn btn-town rg-small-btn rg-return-btn hidden">
-                    <span class="material-icons">anchor</span>
-                    <span class="btn-label">宿へ戻る</span>
-                </button>
             </div>
-            <div id="bait-info" class="rg-bait-slots"></div>
+            <button id="return-btn" class="floating-btn btn-town rg-small-btn rg-return-btn hidden">
+                <span class="material-icons">cottage</span>
+                <span class="btn-label">宿へ戻る</span>
+            </button>
         </div>
     </div>
 

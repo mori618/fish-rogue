@@ -130,18 +130,12 @@ body[data-screen="harbor"] .notification-banner {
 .rg-mark-silver { background: #e5e7eb; }
 .rg-mark-gold { background: #ffd700; }
 
-.rg-progress-text,
-.rg-money {
+.rg-progress-text {
     font-family: 'Roboto Mono', monospace;
     font-size: 16px;
     font-weight: 700;
     white-space: nowrap;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.rg-money {
-    position: relative;
-    color: var(--accent-yellow);
 }
 
 /* 所持金の増減ポップ */
@@ -170,8 +164,28 @@ body[data-screen="harbor"] .notification-banner {
 /* チップ（パワー・コンボ・海域・ヘルプ） */
 .rg-chips {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
+}
+
+/* 釣り場名は長いことがあるので、狭い画面では省略して1行に収める */
+#area-chip {
+    min-width: 0;
+    overflow: hidden;
+}
+
+#area-chip span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rg-chip {
+    flex-shrink: 0;
+}
+
+#area-chip.rg-chip {
+    flex-shrink: 1;
 }
 
 .rg-chip {
@@ -226,27 +240,40 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 /* ----------------------------------------
-   釣り画面: 下部HUD（装備・帰港・餌スロット）
+   釣り画面: 下部HUD（板をやめ、海の上に直接浮かべる）
+   装備は左下、餌スロットは中央、宿へ戻るは右下
    ---------------------------------------- */
 .rg-hud-bottom {
-    flex-direction: column;
-    gap: 8px;
-    width: min(94vw, 440px);
-    padding: 10px 16px 12px;
-    bottom: calc(16px + env(safe-area-inset-bottom));
-    border-radius: 24px;
+    position: absolute;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 100;
+    display: grid;
+    grid-template-columns: 64px 1fr 64px;
+    align-items: end;
+    width: min(96vw, 460px);
+    pointer-events: none;
 }
 
-.rg-hud-actions {
+.rg-hud-bottom > * {
+    pointer-events: auto;
+}
+
+#build-btn { grid-column: 1; }
+.rg-hud-center { grid-column: 2; }
+#return-btn { grid-column: 3; }
+
+.rg-hud-center {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    width: 100%;
+    gap: 4px;
 }
 
 .rg-small-btn {
-    width: 56px;
-    height: 48px;
+    width: 60px;
+    height: 56px;
 }
 
 .rg-return-btn {
@@ -256,6 +283,20 @@ body[data-screen="harbor"] .notification-banner {
     animation: rgPulse 1.6s ease-in-out infinite;
 }
 
+.rg-return-btn .btn-label {
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.rg-return-btn.rg-slide-in {
+    animation: rgSlideIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), rgPulse 1.6s ease-in-out 0.45s infinite;
+}
+
+@keyframes rgSlideIn {
+    from { transform: translate(120px, 40px); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+
 @keyframes rgPulse {
     50% { box-shadow: 0 4px 0 #14532d, 0 0 18px 4px rgba(74, 222, 128, 0.8); }
 }
@@ -263,15 +304,14 @@ body[data-screen="harbor"] .notification-banner {
 .rg-bait-total {
     font-size: 13px;
     font-weight: 700;
-    color: var(--text-light);
-    text-shadow: 1px 1px 0 #4e342e;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .rg-bait-slots {
     display: flex;
     justify-content: center;
     gap: 10px;
-    width: 100%;
 }
 
 .rg-bait-slot {
@@ -279,21 +319,22 @@ body[data-screen="harbor"] .notification-banner {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 64px;
-    height: 64px;
+    width: 62px;
+    height: 62px;
     padding: 0;
     font-family: inherit;
-    background: rgba(0, 0, 0, 0.25);
-    border: 2px solid rgba(255, 255, 255, 0.35);
+    background: rgba(28, 20, 16, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.45);
     border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
     cursor: pointer;
     transition: transform 0.15s ease;
 }
 
 .rg-bait-slot.selected {
-    background: rgba(255, 215, 0, 0.2);
+    background: rgba(78, 52, 46, 0.85);
     border: 3px solid var(--accent-yellow);
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+    box-shadow: 0 0 14px rgba(255, 215, 0, 0.6);
 }
 
 .rg-bait-slot:active {
@@ -317,18 +358,222 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-bait-empty {
     font-size: 13px;
-    color: var(--text-light);
+    color: #fff;
+}
+
+/* 所持金は釣り中はあまり見ないので、チップの列に小さく */
+.rg-chip-money {
+    position: relative;
+    color: var(--accent-yellow);
+}
+
+/* 餌が残り少ないときの警告 */
+.rg-run-warning {
+    align-self: center;
+    padding: 3px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(185, 28, 28, 0.85);
+    border-radius: 12px;
+}
+
+#fishing-screen.rg-danger {
+    animation: rgDanger 1.6s ease-in-out infinite;
+}
+
+@keyframes rgDanger {
+    0%, 100% { box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0); }
+    50% { box-shadow: inset 0 0 50px 10px rgba(239, 68, 68, 0.55); }
+}
+
+/* 目標達成: 進捗バーが光る */
+.rg-progress.rg-flash {
+    animation: rgFlash 0.9s ease-out;
+}
+
+@keyframes rgFlash {
+    0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.9); }
+    40% { box-shadow: 0 0 16px 6px rgba(74, 222, 128, 0.9); }
+    100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+/* コンボ: ウキの位置で弾ける数字と、途切れたときに割れて落ちるチップ */
+.rg-combo-pop {
+    position: absolute;
+    z-index: 80;
+    font-size: 30px;
+    font-weight: 900;
+    color: var(--accent-yellow);
+    text-shadow: 2px 2px 0 #b45309, 0 0 10px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    transform: translate(-50%, 0);
+    animation: rgComboPop 0.9s ease-out forwards;
+}
+
+@keyframes rgComboPop {
+    0% { transform: translate(-50%, 10px) scale(0.4); opacity: 0; }
+    25% { transform: translate(-50%, -10px) scale(1.25); opacity: 1; }
+    100% { transform: translate(-50%, -50px) scale(1); opacity: 0; }
+}
+
+.rg-chip-break {
+    position: fixed !important;
+    z-index: 300;
+    margin: 0;
+    pointer-events: none;
+    animation: rgChipBreak 0.8s ease-in forwards;
+}
+
+@keyframes rgChipBreak {
+    0% { transform: rotate(0); opacity: 1; }
+    20% { transform: translateY(-6px) rotate(-8deg); }
+    100% { transform: translateY(120px) rotate(35deg); opacity: 0; }
+}
+
+/* 釣果カード: 暗転を薄くして海と竿を見せ、魚が跳ねた位置から開く */
+.result-overlay.rg-light-dim {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: none;
+}
+
+.result-overlay.rg-light-dim .result-card {
+    animation: rgCardFromFish 0.4s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+@keyframes rgCardFromFish {
+    from { transform: translate(calc(var(--from-x) - 50vw), calc(var(--from-y) - 50vh)) scale(0.15); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+
+/* 閉じるとき進捗バーへ飛んでいく金額 */
+.rg-fly-amount {
+    position: fixed;
+    z-index: 400;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--accent-yellow);
+    text-shadow: 1px 1px 0 #4e342e, 0 0 8px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    translate: -50% -50%;
+    transition: transform 0.45s cubic-bezier(0.55, 0, 0.45, 1), opacity 0.45s ease-in;
+}
+
+/* 小さなメッセージ（お金が足りない など） */
+.rg-toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(130px + env(safe-area-inset-bottom));
+    z-index: 500;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(28, 20, 16, 0.88);
+    border: 1px solid #8d6e63;
+    border-radius: 20px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    animation: rgToastIn 0.2s ease-out;
+    transition: opacity 0.3s ease;
+}
+
+.rg-toast.hide {
+    opacity: 0;
+}
+
+@keyframes rgToastIn {
+    from { transform: translate(-50%, 10px); opacity: 0; }
 }
 
 /* ----------------------------------------
-   ゲージバトル
+   ゲージバトル: 濃い下地と縁で見やすく、捕獲率はゾーンの中に書く
    ---------------------------------------- */
+.gauge-battle .gauge-container {
+    height: 72px;
+    overflow: visible;
+    background: rgba(28, 20, 16, 0.78);
+    border: 3px solid #4e342e;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.gauge-battle .gauge-bar {
+    overflow: hidden;
+    border-radius: inherit;
+}
+
+.gauge-battle .zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rg-zone-label {
+    font-size: 13px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.white-zone .rg-zone-label {
+    position: absolute;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.white-zone .rg-left { left: 10px; }
+.white-zone .rg-right { right: 10px; }
+
+.gauge-battle .gauge-indicator {
+    width: 5px;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.gauge-indicator.rg-stopped {
+    transform: translateX(-50%) scaleY(1.15);
+    box-shadow: 0 0 18px 6px #fff;
+}
+
+.gauge-indicator.rg-stopped-red { box-shadow: 0 0 20px 8px #fca5a5; }
+.gauge-indicator.rg-stopped-green { box-shadow: 0 0 18px 6px #86efac; }
+
+.rg-stop-label {
+    position: absolute;
+    top: calc(100% + 4px);
+    transform: translateX(-50%);
+    font-size: 20px;
+    font-weight: 900;
+    opacity: 0;
+    pointer-events: none;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.rg-stop-label.show {
+    animation: rgStopLabel 0.9s ease-out forwards;
+}
+
+.rg-stop-red { color: #fca5a5; }
+.rg-stop-green { color: #86efac; }
+.rg-stop-white { color: #e5e7eb; }
+
+@keyframes rgStopLabel {
+    0% { opacity: 0; transform: translate(-50%, 8px) scale(0.6); }
+    30% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
+    100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
 .rg-battle-info {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    margin-bottom: 12px;
+    margin: 0 auto 14px;
+    padding: 8px 18px;
+    width: fit-content;
+    background: rgba(28, 20, 16, 0.65);
+    border-radius: 14px;
     color: #fff;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
 }
@@ -371,26 +616,6 @@ body[data-screen="harbor"] .notification-banner {
 .rg-phase-dots span.on {
     background: #fff;
 }
-
-.rg-zone-rates {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    width: fit-content;
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 8px;
-    padding: 4px 10px;
-    font-size: 14px;
-    font-weight: 700;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.45);
-    border-radius: 10px;
-}
-
-.rg-zone-white { color: #e5e7eb; }
-.rg-zone-red { color: #fca5a5; }
-.rg-zone-green { color: #86efac; }
 
 /* 結果カードの追記 */
 .rg-combo-line {

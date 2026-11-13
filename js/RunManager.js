@@ -193,8 +193,7 @@ const RunManager = {
             SoundManager.play('goal');
             SaveManager.save();
             UIManager.updateStatus();
-            UIManager.showNotification('目標達成！',
-                `いつでも宿へ戻れます。${this.gradeHint()}`, 'flag', 3500);
+            UIManager.celebrateGoal();
         }
 
         if (GameState.getTotalBaitCount() <= 0) {
@@ -308,7 +307,7 @@ const RunManager = {
     },
 
     breakCombo() {
-        if (this.run.combo >= 2) UIManager.showMessage(`コンボが途切れた（×${this.run.combo}）`, 1500);
+        UIManager.breakCombo(this.run.combo);
         this.run.combo = 0;
     },
     gameOver() {

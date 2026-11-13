@@ -391,6 +391,7 @@ const FishingGame = {
         }
         UIManager.updateBaitInfo();
 
+        SaveManager.countCast();
         this.state = 'casting';
         UIManager.showCasting();
 
@@ -591,7 +592,7 @@ const FishingGame = {
                 const feverResult = GameState.progressFever(true);
                 UIManager.updateFeverVisuals();
                 if (feverResult.message === 'end') {
-                    UIManager.showMessage('💨 フィーバー終了...', 3000);
+                    UIManager.showNotification('', 'フィーバー終了', 'cloud', 2000);
                 }
             }
 
@@ -838,6 +839,7 @@ const FishingGame = {
         let zone = UIManager.getGaugeZone(this.gaugePosition);
         RunManager.recordZone(zone);
         SoundManager.play('stop', { zone });
+        UIManager.showGaugeStop(zone);
 
         // 起死回生スキル: 白ゾーンを緑扱いにすることがある
         if (zone === 'white' && Math.random() < GameState.getSecondChanceRate()) {
@@ -909,9 +911,9 @@ const FishingGame = {
         const feverResult = GameState.progressFever();
         UIManager.updateFeverVisuals();
         if (feverResult.message === 'start') {
-            UIManager.showMessage(`🔥 ${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
+            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
         } else if (feverResult.message === 'end') {
-            UIManager.showMessage('💨 フィーバー終了...', 3000);
+            UIManager.showNotification('', 'フィーバー終了', 'cloud', 2000);
         }
 
         // 宝箱の場合
@@ -952,6 +954,7 @@ const FishingGame = {
         const earned = GameState.getSalePrice(fish) * catchCount;
         GameState.addMoney(earned);
         RunManager.recordCatch();
+        UIManager.popCombo(GameState.run.combo);
 
         // 称号付き: ボーナスとしてTier2以上のスキルを1つ
         const drops = [];
@@ -985,7 +988,7 @@ const FishingGame = {
             const feverResult = GameState.progressFever(true);
             UIManager.updateFeverVisuals();
             if (feverResult.message === 'end') {
-                UIManager.showMessage('💨 フィーバー終了...', 3000);
+                UIManager.showNotification('', 'フィーバー終了', 'cloud', 2000);
             }
         }
 
@@ -1015,7 +1018,7 @@ const FishingGame = {
         const feverResult = GameState.progressFever(true);
         UIManager.updateFeverVisuals();
         if (feverResult.message === 'start') {
-            UIManager.showMessage(`🔥 ${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
+            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
         }
 
         if (!skipPenalty) {
@@ -1314,7 +1317,7 @@ const FishingGame = {
                 console.log('⚡ 漁船効果: フィーバーチャージ');
 
                 if (result.message === 'start') {
-                    UIManager.showMessage(`🔥 ${result.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー開始！`, 3000);
+                    UIManager.showNotification('フィーバー開始！', `${result.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${result.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, result.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
                 }
             }
 
