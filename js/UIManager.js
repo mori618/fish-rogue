@@ -19,6 +19,15 @@ const UIManager = {
     // 画面切り替え
     // ========================================
     showScreen(screenId) {
+        // 釣り場 ⇔ 釣り宿の行き来は波で区切る（0.5秒）
+        const from = this.currentScreen;
+        if ((from === 'fishing' && screenId === 'harbor') || (from === 'harbor' && screenId === 'fishing')) {
+            this.playWaveTransition();
+        }
+
+        // 前の画面の案内は持ち越さない
+        document.querySelectorAll('.rg-tip').forEach(el => el.remove());
+
         document.querySelectorAll('.screen').forEach(screen => {
             screen.classList.remove('active');
         });
@@ -50,6 +59,10 @@ const UIManager = {
             RodAnimator.resize();
         } else if (screenId === 'harbor') {
             HarborUI.render();
+            // 到着演出が終わってから案内を出す
+            setTimeout(() => {
+                if (this.currentScreen === 'harbor') this.showTip('inn', '釣り宿：報酬を選ぶ → 買い物 → 下の釣り場カードを押して出発');
+            }, 3000);
         } else if (screenId === 'encyclopedia') {
             EncyclopediaManager.render();
         }
@@ -66,13 +79,64 @@ const UIManager = {
 
         this.updateSoundButtons();
 
+        // 背景にゆっくり揺れる竿（最高記録に応じて素材が上がる）
+        const startScreen = document.getElementById('start-screen');
+        if (startScreen && !startScreen.querySelector('.rg-title-rod')) {
+            const best = SaveManager.loadMeta().bestRound;
+            const rodIndex = Math.min(4, Math.floor(best / 3));
+            const rod = document.createElement('div');
+            rod.className = 'rg-title-rod';
+            rod.innerHTML = RodAnimator.previewSvg('all', rodIndex);
+            startScreen.appendChild(rod);
+        }
+
         const record = document.getElementById('start-record');
         if (record) {
             const meta = SaveManager.loadMeta();
-            record.textContent = meta.totalRuns > 0
-                ? `最高記録: ラウンド${meta.bestRound} クリア${meta.clears > 0 ? ` ／ 釣り旅達成 ${meta.clears}回` : ''}`
-                : '';
+            const unlocked = RunManager.getUnlocked(meta);
+            const total = GAME_DATA.FISH.length;
+            const rows = [];
+            rows.push(`<div class="rg-record-row"><span class="material-icons">menu_book</span>図鑑 <strong>${unlocked.fishCount} / ${total}</strong></div>`);
+            if (meta.totalRuns > 0) {
+                rows.push(`<div class="rg-record-row"><span class="material-icons">military_tech</span>最高 <strong>R${meta.bestRound}クリア</strong>${meta.clears > 0 ? `・達成${meta.clears}回` : ''}</div>`);
+            }
+            if (meta.lastRun) {
+                rows.push(`<div class="rg-record-row"><span class="material-icons">history</span>前回 <strong>R${meta.lastRun.round}</strong>で終了・${meta.lastRun.earned.toLocaleString()} G</div>`);
+            }
+            // 次の解禁
+            const next = RunManager.config.unlocks.find(u => !(u.kind === 'rod' ? unlocked.rods : unlocked.baits).includes(u.id));
+            if (next) {
+                rows.push(`<div class="rg-record-row rg-record-next"><span class="material-icons">lock</span>次の解禁: ${next.label}（${RunManager.unlockNeedText(next)}）</div>`);
+            }
+            record.innerHTML = rows.join('');
         }
+    },
+
+    // 初めての釣り旅の案内（同じ案内は一度だけ）
+    showTip(key, text) {
+        const meta = SaveManager.loadMeta();
+        if (meta.tutorial[key]) return;
+        SaveManager.markTutorial(key);
+        document.querySelectorAll('.rg-tip').forEach(el => el.remove());
+        const tip = document.createElement('div');
+        tip.className = `rg-tip rg-tip-${key}`;
+        tip.innerHTML = `<span class="material-icons">lightbulb</span><span>${text}</span>`;
+        tip.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            tip.remove();
+        });
+        document.body.appendChild(tip);
+        setTimeout(() => tip.classList.add('rg-hide'), 4200);
+        setTimeout(() => tip.remove(), 4600);
+    },
+
+    playWaveTransition() {
+        document.querySelectorAll('.rg-wave-transition').forEach(el => el.remove());
+        const wave = document.createElement('div');
+        wave.className = 'rg-wave-transition';
+        wave.innerHTML = '<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0 H70 Q78 12 70 25 T70 50 T70 75 T70 100 H0 Z"/></svg>';
+        document.body.appendChild(wave);
+        setTimeout(() => wave.remove(), 600);
     },
 
     // 効果音のオン／オフ表示（タイトルと装備画面のボタン）
@@ -403,6 +467,7 @@ const UIManager = {
     // 釣り画面: 待機（ウキ静止）
     // ========================================
     showWaiting() {
+        this.showTip('hit', 'ウキが揺れても待つ。沈んだ瞬間にタップして合わせよう');
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
@@ -460,6 +525,7 @@ const UIManager = {
     // 釣り画面: ゲージバトル（インライン）
     // ========================================
     showGaugeBattle(fish, redZoneWidth, info = null) {
+        this.showTip('gauge', '動く印を赤ゾーンで止めると一番釣れる。各ゾーンの数字が捕獲率');
         this.redZoneWidth = redZoneWidth;
 
         const fishingArea = document.getElementById('fishing-area');

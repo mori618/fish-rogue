@@ -5,6 +5,47 @@
    ======================================== */
 
 /* ----------------------------------------
+   デザインの基準（設計書11.3）
+   文字: 12 / 14 / 16 / 20 / 28px、余白: 4 / 8 / 12 / 16 / 24px
+   ボタンは3種類: 主（btn-main / rg-btn-primary）、副（btn-nav / rg-btn-secondary）、危険（rg-btn-danger）
+   ---------------------------------------- */
+:root {
+    --fs-xs: 12px;
+    --fs-sm: 14px;
+    --fs-md: 16px;
+    --fs-lg: 20px;
+    --fs-xl: 28px;
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --wood-dark: #3e2723;
+    --wood-mid: #4e342e;
+    --wood-light: #6d4c41;
+    --wood-grain: repeating-linear-gradient(92deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 9px),
+        repeating-linear-gradient(88deg, rgba(0, 0, 0, 0.06) 0 1px, transparent 1px 13px);
+}
+
+.rg-btn-primary {
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+}
+
+.rg-btn-secondary {
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-color);
+}
+
+.rg-btn-danger,
+.rg-retire-btn {
+    color: #fecaca !important;
+    background: rgba(127, 29, 29, 0.55) !important;
+    border: 1px solid #ef4444 !important;
+}
+
+/* ----------------------------------------
    共通
    ---------------------------------------- */
 /* アイコンフォントが読み込めなくても、名前の文字列でレイアウトが崩れないよう枠を固定する */
@@ -56,7 +97,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-start-record {
     margin-top: var(--spacing-lg);
     min-height: 1.5em;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: var(--accent-color);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
@@ -91,7 +132,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-round {
     font-weight: 900;
-    font-size: 16px;
+    font-size: var(--fs-md);
     color: var(--accent-yellow);
     text-shadow: 1px 1px 0 #4e342e;
 }
@@ -132,7 +173,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-progress-text {
     font-family: 'Roboto Mono', monospace;
-    font-size: 16px;
+    font-size: var(--fs-md);
     font-weight: 700;
     white-space: nowrap;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -143,7 +184,7 @@ body[data-screen="harbor"] .notification-banner {
     position: absolute;
     right: 0;
     top: 100%;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     font-weight: 900;
     pointer-events: none;
     animation: rgMoneyPop 1.2s ease-out forwards;
@@ -191,10 +232,10 @@ body[data-screen="harbor"] .notification-banner {
 .rg-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     min-height: 30px;
     padding: 2px 12px;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #fff;
     background: rgba(0, 0, 0, 0.55);
@@ -203,7 +244,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-chip .material-icons {
-    font-size: 16px;
+    font-size: var(--fs-md);
 }
 
 .rg-chip-combo {
@@ -268,7 +309,7 @@ body[data-screen="harbor"] .notification-banner {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
 }
 
 .rg-small-btn {
@@ -302,7 +343,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-bait-total {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #fff;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
@@ -342,7 +383,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-bait-rank {
-    font-size: 20px;
+    font-size: var(--fs-lg);
     font-weight: 900;
     line-height: 1;
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6);
@@ -357,7 +398,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-bait-empty {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     color: #fff;
 }
 
@@ -371,7 +412,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-run-warning {
     align-self: center;
     padding: 3px 12px;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #fff;
     background: rgba(185, 28, 28, 0.85);
@@ -450,7 +491,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-fly-amount {
     position: fixed;
     z-index: 400;
-    font-size: 22px;
+    font-size: var(--fs-lg);
     font-weight: 900;
     color: var(--accent-yellow);
     text-shadow: 1px 1px 0 #4e342e, 0 0 8px rgba(0, 0, 0, 0.5);
@@ -466,7 +507,7 @@ body[data-screen="harbor"] .notification-banner {
     bottom: calc(130px + env(safe-area-inset-bottom));
     z-index: 500;
     padding: 8px 18px;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #fff;
     background: rgba(28, 20, 16, 0.88);
@@ -509,7 +550,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-zone-label {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 900;
     color: #fff;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
@@ -519,7 +560,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .white-zone .rg-zone-label {
     position: absolute;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     color: rgba(255, 255, 255, 0.75);
 }
 
@@ -543,7 +584,7 @@ body[data-screen="harbor"] .notification-banner {
     position: absolute;
     top: calc(100% + 4px);
     transform: translateX(-50%);
-    font-size: 20px;
+    font-size: var(--fs-lg);
     font-weight: 900;
     opacity: 0;
     pointer-events: none;
@@ -568,7 +609,7 @@ body[data-screen="harbor"] .notification-banner {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     margin: 0 auto 14px;
     padding: 8px 18px;
     width: fit-content;
@@ -579,13 +620,13 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-battle-rank {
-    font-size: 16px;
+    font-size: var(--fs-md);
     font-weight: 700;
 }
 
 .rg-matchup {
     padding: 2px 14px;
-    font-size: 15px;
+    font-size: var(--fs-md);
     font-weight: 900;
     border-radius: 12px;
     background: rgba(0, 0, 0, 0.5);
@@ -598,12 +639,12 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-battle-power {
     font-family: 'Roboto Mono', monospace;
-    font-size: 14px;
+    font-size: var(--fs-sm);
 }
 
 .rg-phase-dots {
     display: flex;
-    gap: 8px;
+    gap: var(--sp-2);
 }
 
 .rg-phase-dots span {
@@ -626,7 +667,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-fail-reason {
     margin-top: 8px;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #fde68a;
 }
@@ -654,13 +695,13 @@ body[data-screen="harbor"] .notification-banner {
 .rg-build-head {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    font-size: 14px;
+    gap: var(--sp-2);
+    font-size: var(--fs-sm);
     color: var(--text-secondary);
 }
 
 .rg-build-head strong {
-    font-size: 16px;
+    font-size: var(--fs-md);
     color: var(--text-primary);
 }
 
@@ -677,7 +718,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-bench-label {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
 }
 
@@ -712,7 +753,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-skill-chip.rg-benched .material-icons {
-    font-size: 20px;
+    font-size: var(--fs-lg);
 }
 
 /* 結果・報酬 */
@@ -743,7 +784,7 @@ body[data-screen="harbor"] .notification-banner {
     align-items: center;
     gap: var(--spacing-md);
     padding: 6px 0;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     color: var(--text-secondary);
 }
 
@@ -770,7 +811,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-grade small {
     font-family: var(--font-main);
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 400;
     color: var(--text-secondary);
 }
@@ -792,7 +833,7 @@ body[data-screen="harbor"] .notification-banner {
     flex-wrap: wrap;
     gap: 6px;
     margin: var(--spacing-md) 0 var(--spacing-sm);
-    font-size: 15px;
+    font-size: var(--fs-md);
     color: var(--accent-color);
 }
 
@@ -801,7 +842,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-section-title small {
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 400;
     color: var(--text-secondary);
 }
@@ -848,12 +889,12 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-reward-name {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     font-weight: 700;
 }
 
 .rg-reward-desc {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     line-height: 1.4;
     color: var(--text-secondary);
 }
@@ -873,7 +914,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-tier-badge {
     display: inline-block;
     padding: 1px 8px;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 700;
     color: #1c1410;
     background: var(--rg-tier-color);
@@ -883,7 +924,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-skill-icon {
     flex-shrink: 0;
-    font-size: 26px;
+    font-size: var(--fs-xl);
     color: var(--rg-tier-color);
 }
 
@@ -901,7 +942,7 @@ body[data-screen="harbor"] .notification-banner {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     min-height: 44px;
     padding: 10px 6px;
     color: var(--text-primary);
@@ -934,13 +975,13 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-card-name {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 700;
 }
 
 .rg-card-desc {
     flex: 1;
-    font-size: 12px;
+    font-size: var(--fs-xs);
     line-height: 1.35;
     color: var(--text-secondary);
 }
@@ -949,7 +990,7 @@ body[data-screen="harbor"] .notification-banner {
     margin-top: 4px;
     padding: 4px 10px;
     font-family: 'Roboto Mono', monospace;
-    font-size: 15px;
+    font-size: var(--fs-md);
     font-weight: 700;
     color: #fff;
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
@@ -958,7 +999,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-price.rg-short {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     color: #fca5a5;
     background: rgba(239, 68, 68, 0.15);
 }
@@ -982,7 +1023,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-rate {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #86efac;
 }
@@ -995,7 +1036,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-reroll-btn {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     min-height: 36px;
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.1);
@@ -1003,7 +1044,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-reroll-btn .material-icons {
-    font-size: 16px;
+    font-size: var(--fs-md);
 }
 
 .rg-sell-btn {
@@ -1014,7 +1055,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-empty-slot {
     padding: 10px var(--spacing-md);
-    font-size: 13px;
+    font-size: var(--fs-sm);
     text-align: center;
     color: var(--text-secondary);
     border: 1px dashed var(--secondary-color);
@@ -1061,8 +1102,8 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-start-rod .rg-rod-preview { grid-area: pic; }
-.rg-start-rod .rg-card-name { grid-area: name; font-size: 15px; align-self: end; }
-.rg-start-rod .rg-card-desc { grid-area: desc; font-size: 13px; align-self: start; }
+.rg-start-rod .rg-card-name { grid-area: name; font-size: var(--fs-md); align-self: end; }
+.rg-start-rod .rg-card-desc { grid-area: desc; font-size: var(--fs-sm); align-self: start; }
 
 /* 効果音のオン／オフ */
 .rg-sound-btn {
@@ -1073,7 +1114,7 @@ body[data-screen="harbor"] .notification-banner {
     margin-top: var(--spacing-md);
     padding: 6px 16px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: #fff;
     background: rgba(0, 0, 0, 0.45);
@@ -1101,9 +1142,9 @@ body[data-screen="harbor"] .notification-banner {
 .rg-next-label {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--sp-2);
     margin-bottom: 8px;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: var(--accent-color);
 }
@@ -1150,19 +1191,19 @@ body[data-screen="harbor"] .notification-banner {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 16px;
+    font-size: var(--fs-md);
     font-weight: 700;
 }
 
 .rg-area-target {
     font-family: 'Roboto Mono', monospace;
-    font-size: 15px;
+    font-size: var(--fs-md);
     font-weight: 700;
     color: var(--accent-yellow);
 }
 
 .rg-area-desc {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     line-height: 1.35;
     color: #e0f2fe;
 }
@@ -1215,7 +1256,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-skill-detail {
     margin-bottom: var(--spacing-sm);
-    font-size: 14px;
+    font-size: var(--fs-sm);
     line-height: 1.5;
 }
 
@@ -1232,7 +1273,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-note {
     margin: var(--spacing-md) 0;
-    font-size: 12px;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
 }
 
@@ -1257,7 +1298,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-gameover-lead {
     margin: var(--spacing-sm) 0 var(--spacing-md);
-    font-size: 14px;
+    font-size: var(--fs-sm);
     line-height: 1.6;
     color: var(--text-secondary);
 }
@@ -1341,7 +1382,7 @@ body[data-screen="harbor"] .notification-banner {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     padding: 16px 28px;
     color: #fff;
     text-align: center;
@@ -1365,7 +1406,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-intro-region {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     color: var(--accent-color);
 }
 
@@ -1379,12 +1420,12 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-intro-spot {
-    font-size: 20px;
+    font-size: var(--fs-lg);
     font-weight: 700;
 }
 
 .rg-intro-detail {
-    font-size: 14px;
+    font-size: var(--fs-sm);
 }
 
 /* 効果のタグ（得は緑、損は赤） */
@@ -1392,13 +1433,13 @@ body[data-screen="harbor"] .notification-banner {
 .rg-intro-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--sp-1);
     justify-content: center;
 }
 
 .rg-tag {
     padding: 1px 7px;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 700;
     border-radius: 8px;
     white-space: nowrap;
@@ -1419,7 +1460,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-area-card .rg-area-name {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     line-height: 1.25;
 }
 
@@ -1428,7 +1469,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-area-high {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     color: #fde68a;
 }
 
@@ -1467,11 +1508,11 @@ body[data-screen="harbor"] .notification-banner {
 .rg-family-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
     min-height: 32px;
     padding: 4px 10px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     color: var(--text-secondary);
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1484,12 +1525,12 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-family-chip small {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     opacity: 0.85;
 }
 
 .rg-family-chip .material-icons {
-    font-size: 16px;
+    font-size: var(--fs-md);
 }
 
 .rg-family-chip.rg-on {
@@ -1518,14 +1559,14 @@ body[data-screen="harbor"] .notification-banner {
     gap: 3px;
     margin-top: 2px;
     padding: 2px 8px;
-    font-size: 12px;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     background: rgba(0, 0, 0, 0.2);
     border-radius: 10px;
 }
 
 .rg-synergy .material-icons {
-    font-size: 14px;
+    font-size: var(--fs-sm);
 }
 
 .rg-synergy.rg-fire {
@@ -1582,12 +1623,12 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-shop-name {
-    font-size: 16px;
+    font-size: var(--fs-md);
     font-weight: 700;
 }
 
 .rg-shop-desc {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     line-height: 1.4;
     color: var(--text-secondary);
 }
@@ -1598,7 +1639,7 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-locked-line {
     margin: 6px 0 0;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     color: var(--text-secondary);
 }
 
@@ -1614,7 +1655,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-special-tile .rg-card-desc {
-    font-size: 12px;
+    font-size: var(--fs-xs);
 }
 
 /* 購入の演出 */
@@ -1697,8 +1738,8 @@ body[data-screen="harbor"] .notification-banner {
     width: min(84vw, 320px);
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    font-size: 16px;
+    gap: var(--sp-2);
+    font-size: var(--fs-md);
     color: var(--text-secondary);
 }
 
@@ -1715,7 +1756,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-arrival-total {
     padding-top: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.2);
-    font-size: 20px;
+    font-size: var(--fs-lg);
 }
 
 .rg-arrival-total strong {
@@ -1723,7 +1764,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-arrival-hint {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     color: var(--text-secondary);
     opacity: 0;
 }
@@ -1734,7 +1775,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-summary-compact .rg-summary-row span {
-    font-size: 13px;
+    font-size: var(--fs-sm);
 }
 
 /* ヌシ */
@@ -1752,7 +1793,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-next-nushi {
     margin-left: 6px;
     padding: 1px 8px;
-    font-size: 12px;
+    font-size: var(--fs-xs);
     border-radius: 10px;
 }
 
@@ -1768,7 +1809,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-intro-nushi {
     margin-top: 6px;
     padding: 4px 14px;
-    font-size: 15px;
+    font-size: var(--fs-md);
     font-weight: 700;
     color: #1c1410;
     background: linear-gradient(135deg, #fde68a, #f59e0b);
@@ -1790,7 +1831,7 @@ body[data-screen="harbor"] .notification-banner {
     min-height: 36px;
     padding: 4px 12px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     color: var(--text-primary);
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid var(--border-color);
@@ -1811,7 +1852,7 @@ body[data-screen="harbor"] .notification-banner {
 .rg-nushi-tag {
     display: inline-block;
     padding: 0 8px;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     font-weight: 900;
     color: #1c1410;
     background: linear-gradient(135deg, #fde68a, #f59e0b);
@@ -1820,7 +1861,7 @@ body[data-screen="harbor"] .notification-banner {
 
 /* 狭い画面ではチップの余白を詰め、エリア名を先に縮める（ヘルプが押し出されないように） */
 @media (max-width: 480px) {
-    .rg-chips { gap: 4px; }
+    .rg-chips { gap: var(--sp-1); }
     .rg-chip { padding: 2px 8px; }
     .rg-chip-btn { min-width: 40px; }
     #area-chip.rg-chip { flex: 0 1 auto; min-width: 34px; }
@@ -1828,4 +1869,154 @@ body[data-screen="harbor"] .notification-banner {
 
 .rg-chip-nushi {
     padding: 2px 8px;
+}
+
+/* 同梱した SVG アイコン（Icons.js が .material-icons の中身を差し替える） */
+.material-icons {
+    font-family: inherit;
+    vertical-align: middle;
+}
+
+.material-icons svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+
+/* 木目を板（カード・帯・ヘッダー）にそろえる。背景色の指定より後に置く */
+.rg-build,
+.rg-card:not(.rg-special-tile),
+.rg-shop-row,
+.rg-reward-card,
+.rg-summary,
+.shop-header,
+.rg-next-info {
+    background-image: var(--wood-grain);
+}
+
+/* 価格は真鍮色（木目に合わせる） */
+.rg-price {
+    background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+}
+
+/* 初めての案内 */
+.rg-tip {
+    position: fixed;
+    left: 50%;
+    top: calc(150px + env(safe-area-inset-top));
+    z-index: 2600;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    width: min(88vw, 380px);
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+    color: #1c1410;
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    transform: translateX(-50%);
+    animation: rg-tip-in 0.3s ease-out;
+}
+
+.rg-tip .material-icons {
+    font-size: 22px;
+    color: #b45309;
+}
+
+.rg-tip.rg-hide {
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+body[data-screen="harbor"] .rg-tip {
+    top: auto;
+    bottom: calc(200px + env(safe-area-inset-bottom));
+}
+
+@keyframes rg-tip-in {
+    from { opacity: 0; transform: translate(-50%, -8px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* 釣り場 ⇔ 釣り宿の波 */
+.rg-wave-transition {
+    position: fixed;
+    inset: 0;
+    z-index: 2400;
+    pointer-events: none;
+    animation: rg-wave-sweep 0.5s ease-in-out forwards;
+}
+
+.rg-wave-transition svg {
+    width: 140%;
+    height: 100%;
+    fill: #0369a1;
+    filter: drop-shadow(8px 0 0 rgba(125, 211, 252, 0.6));
+}
+
+@keyframes rg-wave-sweep {
+    0% { transform: translateX(-140%); }
+    100% { transform: translateX(100%); }
+}
+
+/* タイトルの記録 */
+.rg-start-record {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    align-items: center;
+}
+
+.rg-record-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    font-size: var(--fs-sm);
+    color: var(--text-secondary);
+}
+
+.rg-record-row strong {
+    color: var(--text-primary);
+}
+
+.rg-record-row .material-icons {
+    font-size: 16px;
+}
+
+.rg-record-next {
+    font-size: var(--fs-xs);
+    opacity: 0.85;
+}
+
+/* タイトル背景の竿（ゆっくり揺れる） */
+.rg-title-rod {
+    position: absolute;
+    right: -10px;
+    bottom: 8%;
+    width: min(60vw, 320px);
+    opacity: 0.55;
+    pointer-events: none;
+    transform-origin: 10% 90%;
+    animation: rg-title-rod-sway 4s ease-in-out infinite;
+}
+
+.rg-title-rod svg {
+    width: 100%;
+    height: auto;
+}
+
+@keyframes rg-title-rod-sway {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(-4deg); }
+}
+
+/* 主ボタンも真鍮色にそろえる */
+.btn-main {
+    background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+    border-color: #78350f;
 }
