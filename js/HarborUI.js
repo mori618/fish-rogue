@@ -1,14 +1,14 @@
-// 港（ラウンド間）画面と、航海まわりのモーダルの描画
+// 釣り宿（ラウンド間）画面と、釣り旅まわりのモーダルの描画
 // 状態の変更はすべて RunManager 経由で行い、ここは表示と入力の受け渡しだけを担当する。
 //
-// 港は1画面: 上に常時表示のビルド帯、その下に「結果と報酬3択」→「ショップ」、
-// フッターの海域カードがそのまま出航ボタンになる。
+// 釣り宿は1画面: 上に常時表示のビルド帯、その下に「結果と報酬3択」→「ショップ」、
+// フッターの釣り場カードがそのまま出発ボタンになる。
 
 const HarborUI = {
     TIER_LABELS: { 0: '特別', 1: 'I', 2: 'II', 3: 'III', 4: '極' },
 
     // ========================================
-    // 港画面
+    // 釣り宿画面
     // ========================================
     render() {
         const run = GameState.run;
@@ -16,7 +16,7 @@ const HarborUI = {
         if (!main || !run || !run.harbor) return;
 
         const harbor = run.harbor;
-        document.getElementById('harbor-title').textContent = `港 ― R${run.round} クリア`;
+        document.getElementById('harbor-title').textContent = `釣り宿 ― R${run.round} クリア`;
         UIManager.updateMoney();
 
         main.innerHTML = this.buildHtml() + (harbor.rewardTaken
@@ -74,7 +74,7 @@ const HarborUI = {
         const grade = GAME_DATA.ROGUE_CONFIG.grades.find(g => g.id === summary.grade);
         const gradeNote = { gold: '報酬4択・Tier1段階上・入れ替え1回無料', silver: '報酬4択', bronze: '' }[grade.id];
         const banner = summary.isFinalClear
-            ? `<div class="rg-banner"><span class="material-icons">emoji_events</span> 航海達成！ ここから先はエンドレスです</div>`
+            ? `<div class="rg-banner"><span class="material-icons">emoji_events</span> 釣り旅達成！ ここから先はエンドレスです</div>`
             : '';
 
         return `
@@ -221,34 +221,40 @@ const HarborUI = {
     },
 
     // ----------------------------------------
-    // フッター: 海域カード（タップでそのまま出航）
+    // フッター: 釣り場カード（タップでそのまま出発）
     // ----------------------------------------
     areaHtml(harbor) {
         const run = GameState.run;
         const nextRound = run.round + 1;
+        const region = RunManager.getRegion(nextRound);
         const supply = GAME_DATA.BAITS.find(b => b.id === RunManager.getSupplyBait(nextRound));
         const locked = !harbor.rewardTaken;
 
-        const cards = harbor.areaOffers.map(id => {
-            const area = RunManager.getArea(id);
+        const cards = harbor.spotOffers.map((offer, index) => {
+            const spot = region.spots.find(s => s.id === offer.spot);
+            const weather = RunManager.getWeather(offer.weather);
+            const highValue = GAME_DATA.FISH.find(f => f.id === offer.highValue);
+            const isNew = RunManager.spotHasNewFish(nextRound, offer.spot);
+            const tags = weather.tags.map(t => `<span class="rg-tag ${t.good ? 'good' : 'bad'}">${t.text}</span>`).join('');
             return `
-                <button class="rg-area-card" onclick="HarborUI.onDepart('${id}')" ${locked ? 'disabled' : ''}>
-                    <span class="rg-area-name"><span class="material-icons">${area.icon}</span>${area.name}</span>
-                    <span class="rg-area-target">目標 ${RunManager.getTarget(nextRound, id).toLocaleString()} G</span>
-                    <span class="rg-area-desc">${area.description}</span>
+                <button class="rg-area-card rg-weather-${weather.id}" onclick="HarborUI.onDepart(${index})" ${locked ? 'disabled' : ''}>
+                    ${isNew ? '<span class="rg-new-badge">未登録あり</span>' : ''}
+                    <span class="rg-area-name"><span class="material-icons">${weather.icon}</span>${GameState.getSpotDisplayName(spot, weather)}</span>
+                    <span class="rg-area-target">目標 ${RunManager.getTarget(nextRound, weather.id).toLocaleString()} G</span>
+                    <span class="rg-area-high">高値: ${highValue ? highValue.name : '―'}</span>
+                    ${tags ? `<span class="rg-tags">${tags}</span>` : ''}
                 </button>
             `;
         }).join('');
 
         return `
-            <div class="rg-next-label">${locked ? '報酬を選ぶと出航できます' : `R${nextRound} の海域を選んで出航`}
+            <div class="rg-next-label">${locked ? '報酬を選ぶと出発できます' : `R${nextRound} ${region.name}：釣り場を選んで出発`}
                 <span class="rg-next-supply">支給: ${supply.name}×${RunManager.config.baitPerRound}</span></div>
-            <div class="rg-area-row">${cards}</div>
+            <div class="rg-area-row rg-cols-${harbor.spotOffers.length}">${cards}</div>
         `;
     },
-
     // ========================================
-    // 港: 入力ハンドラ
+    // 釣り宿: 入力ハンドラ
     // ========================================
     _after(success, failMessage = 'お金が足りません') {
         SoundManager.play(success ? 'buy' : 'deny');
@@ -279,14 +285,14 @@ const HarborUI = {
     onUpgradeRod() { this._after(RunManager.upgradeRod()); },
     onBuyRod(index) { this._after(RunManager.buyNextRod(index)); },
 
-    onDepart(areaId) {
-        if (!RunManager.depart(areaId)) {
+    onDepart(index) {
+        if (!RunManager.depart(index)) {
             UIManager.showMessage('先に報酬スキルを選んでください', 1500);
         }
     },
 
     // ========================================
-    // スキル詳細（港では装備の付け替え・売却もここで行う）
+    // スキル詳細（釣り宿では装備の付け替え・売却もここで行う）
     // ========================================
     showSkill(skillId, isEquipped) {
         const skill = GameState.getSkillData(skillId);
@@ -346,13 +352,15 @@ const HarborUI = {
     },
 
     // ========================================
-    // 釣り中の装備確認（閲覧のみ。変更は港で行う）
+    // 釣り中の装備確認（閲覧のみ。変更は釣り宿で行う）
     // ========================================
     showBuild() {
         const run = GameState.run;
         if (!run) return;
 
-        const area = GameState.getCurrentArea();
+        const weather = GameState.getCurrentWeather();
+        const region = GameState.getCurrentRegion();
+        const highValue = GAME_DATA.FISH.find(f => f.id === run.highValue);
         const skills = GameState.equippedSkills.map(id => this.skillRow(id)).join('')
             || '<div class="rg-empty-slot">スキルを装備していません</div>';
 
@@ -367,13 +375,14 @@ const HarborUI = {
                     <div class="rg-summary-row"><span></span><span class="rg-area-desc">${GameState.getRodType().description}</span></div>
                     <div class="rg-summary-row"><span>釣りパワー</span><strong>${GameState.getTotalPower()}</strong></div>
                     <div class="rg-summary-row"><span>スキルスロット</span><strong>${GameState.equippedSkills.length} / ${GameState.getSkillSlots()}</strong></div>
-                    ${area ? `<div class="rg-summary-row"><span>海域</span><strong>${area.name}</strong></div>
-                    <div class="rg-summary-row"><span></span><span class="rg-area-desc">${area.description}</span></div>` : ''}
+                    ${weather ? `<div class="rg-summary-row"><span>釣り場</span><strong>${region.name}・${GameState.getSpotDisplayName()}</strong></div>
+                    <div class="rg-summary-row"><span>天候：${weather.name}</span><span class="rg-area-desc">${weather.description}</span></div>` : ''}
+                    ${highValue ? `<div class="rg-summary-row"><span>本日の高値</span><strong>${highValue.name}（売値${RunManager.config.highValueMult}倍）</strong></div>` : ''}
                 </div>
                 <div class="shop-items">${skills}</div>
-                <p class="rg-note">装備の変更と買い物は、ラウンドをクリアした後の港で行えます。</p>
+                <p class="rg-note">装備の変更と買い物は、ラウンドをクリアした後の釣り宿で行えます。</p>
                 <button class="rg-sound-btn" onclick="UIManager.toggleSound()"></button>
-                <button class="btn-nav rg-retire-btn" onclick="HarborUI.onRetire()">この航海をリタイアする</button>
+                <button class="btn-nav rg-retire-btn" onclick="HarborUI.onRetire()">この釣り旅をリタイアする</button>
             </div>
         `);
         overlay.addEventListener('click', e => {
@@ -426,7 +435,7 @@ const HarborUI = {
     },
 
     onRetire() {
-        if (!window.confirm('この航海を終了しますか？（進行状況は失われます）')) return;
+        if (!window.confirm('この釣り旅を終了しますか？（進行状況は失われます）')) return;
         this.closeModal('build-modal');
         RunManager.retire();
     },

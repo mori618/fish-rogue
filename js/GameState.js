@@ -1,5 +1,5 @@
 // ゲーム状態管理
-// 1回の航海（ラン）中のプレイヤー状態を一元管理する。
+// 1回の釣り旅（ラン）中のプレイヤー状態を一元管理する。
 // ラウンド進行そのものは RunManager が担当する。
 
 const GameState = {
@@ -14,7 +14,7 @@ const GameState = {
     rank: 1,
 
     // ========================================
-    // 航海（ラン）の進行状況
+    // 釣り旅（ラン）の進行状況
     // ========================================
     run: null,  // { round, target, earned, phase, offers, ... } 詳細は RunManager.createRun
 
@@ -48,12 +48,12 @@ const GameState = {
     gachaTickets: 0,
 
     // ========================================
-    // 図鑑（航海をまたいで引き継ぐ）
+    // 図鑑（釣り旅をまたいで引き継ぐ）
     // ========================================
     encyclopedia: {},
 
     // ========================================
-    // この航海の統計
+    // この釣り旅の統計
     // ========================================
     totalFishCaught: 0,
     caughtByRank: { 'D': 0, 'C': 0, 'B': 0, 'A': 0, 'S': 0, 'SS': 0 },
@@ -72,7 +72,7 @@ const GameState = {
 
     // ========================================
     // 初期化
-    // saveData があれば中断した航海を復元、なければ新しい航海用にリセット
+    // saveData があれば中断した釣り旅を復元、なければ新しい釣り旅用にリセット
     // ========================================
     init(saveData = null) {
         const s = saveData || {};
@@ -96,7 +96,7 @@ const GameState = {
         this.inventory = [];
         this.gachaTickets = 0;
 
-        // 図鑑は航海をまたぐメタデータから読む
+        // 図鑑は釣り旅をまたぐメタデータから読む
         this.encyclopedia = { ...SaveManager.loadMeta().encyclopedia };
 
         this.totalFishCaught = s.totalFishCaught || 0;
@@ -168,9 +168,11 @@ const GameState = {
         }
     },
 
-    // 魚1匹あたりの売値（スキル・海域・コンボ補正込み）
+    // 魚1匹あたりの売値（スキル・天候・コンボ・本日の高値の補正込み）
     getSalePrice(fish) {
-        return Math.floor(fish.price * (1 + this.getPriceBonus()) * (1 + this.getComboBonus()));
+        // 本日の高値の魚は売値が上がる
+        const highValue = this.run && this.run.highValue === fish.id ? GAME_DATA.ROGUE_CONFIG.highValueMult : 1;
+        return Math.floor(fish.price * highValue * (1 + this.getPriceBonus()) * (1 + this.getComboBonus()));
     },
 
     // 連続成功コンボによる売値ボーナス（0.1 = +10%）
@@ -198,10 +200,29 @@ const GameState = {
         return `${GAME_DATA.ROGUE_CONFIG.rodMaterials[rodIndex]}の${this.getRodType(typeId).name}`;
     },
 
-    // 今いる海域（ラウンド中のみ）
-    getCurrentArea() {
-        if (!this.run || !this.run.area) return null;
-        return GAME_DATA.ROGUE_CONFIG.areas.find(a => a.id === this.run.area) || null;
+    // ========================================
+    // 水域・釣り場・天候（ラウンド中のみ）
+    // ========================================
+    getCurrentRegion() {
+        if (!this.run || !this.run.region) return null;
+        return GAME_DATA.ROGUE_CONFIG.regions.find(r => r.id === this.run.region) || null;
+    },
+
+    getCurrentSpot() {
+        const region = this.getCurrentRegion();
+        if (!region) return null;
+        return region.spots.find(s => s.id === this.run.spot) || null;
+    },
+
+    getCurrentWeather() {
+        if (!this.run || !this.run.weather) return null;
+        return GAME_DATA.ROGUE_CONFIG.weathers.find(w => w.id === this.run.weather) || null;
+    },
+
+    // 「嵐の堤防」のような釣り場の表示名
+    getSpotDisplayName(spot = this.getCurrentSpot(), weather = this.getCurrentWeather()) {
+        if (!spot) return '';
+        return `${weather ? weather.prefix : ''}${spot.name}`;
     },
 
     // ========================================
@@ -1032,10 +1053,10 @@ const GameState = {
         // 竿のタイプの効果は「その竿を持っている間だけ装備される見えないスキル」として混ぜる
         this.getRodType().effects.forEach(effect => this._collectEffects(effect, type, effects));
 
-        // 海域の効果は「その海域にいる間だけ装備される見えないスキル」として混ぜる
-        const area = this.getCurrentArea();
-        if (area) {
-            area.effects.forEach(effect => this._collectEffects(effect, type, effects));
+        // 天候の効果は「その天候の間だけ装備される見えないスキル」として混ぜる
+        const weather = this.getCurrentWeather();
+        if (weather) {
+            weather.effects.forEach(effect => this._collectEffects(effect, type, effects));
         }
         return effects;
     },

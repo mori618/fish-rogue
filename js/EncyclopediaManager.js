@@ -5,6 +5,17 @@ const EncyclopediaManager = {
     // ========================================
     // 図鑑画面をレンダリング
     // ========================================
+    // 魚がよく釣れる釣り場（「田んぼ（里の水辺）」）。どこでも釣れる魚は「各地」
+    getSpotLabel(fishId) {
+        const places = [];
+        GAME_DATA.ROGUE_CONFIG.regions.forEach(region => {
+            region.spots.forEach(spot => {
+                if (spot.fish.includes(fishId)) places.push(`${spot.name}（${region.name}）`);
+            });
+        });
+        return places.length ? places.join('、') : '各地（まれ）';
+    },
+
     render() {
         const container = document.getElementById('encyclopedia-list');
         const progressDisplay = document.getElementById('encyclopedia-progress');
@@ -50,6 +61,7 @@ const EncyclopediaManager = {
                         </div>
                         <div class="fish-count">捕獲数: ${normalCount} 匹</div>
                         <div class="fish-frequency">出現頻度: ${fish.frequency || '不明'}</div>
+                        <div class="fish-frequency">釣り場: ${this.getSpotLabel(fish.id)}</div>
                         <div class="fish-description">${fish.description}</div>
                     </div>
                 `;

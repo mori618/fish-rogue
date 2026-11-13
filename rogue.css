@@ -1073,3 +1073,155 @@ body[data-screen="harbor"] .notification-banner {
 
     .rg-cols-4 { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ----------------------------------------
+   水域ごとの岸辺の景色（水平線の上に重ねる）
+   ---------------------------------------- */
+.rg-shore {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(30% - 64px);
+    height: 64px;
+    z-index: 2;
+    pointer-events: none;
+    background-repeat: repeat-x;
+    background-size: 400px 64px;
+    background-position: left bottom;
+}
+
+#fishing-screen[data-region="village"] .rg-shore {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 64'%3E%3Cpath d='M0 64V40Q60 22 120 36T240 30T400 38V64Z' fill='%2387b77e'/%3E%3Cpath d='M0 64V54Q100 48 200 54T400 52V64Z' fill='%23a8c96b'/%3E%3Cg fill='%234d7c4a'%3E%3Ccircle cx='70' cy='36' r='9'/%3E%3Ccircle cx='82' cy='38' r='7'/%3E%3Ccircle cx='260' cy='32' r='10'/%3E%3Ccircle cx='274' cy='35' r='7'/%3E%3C/g%3E%3Cg stroke='%23556b2f' stroke-width='1.5'%3E%3Cpath d='M20 64L18 50M24 64L26 48M150 64L148 52M154 64L157 50M330 64L328 50M334 64L337 51'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+#fishing-screen[data-region="river"] .rg-shore {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 64'%3E%3Cpath d='M0 64V42L50 14L90 38L140 4L200 44L250 18L310 40L360 10L400 34V64Z' fill='%238aa0b8'/%3E%3Cpath d='M140 4L128 18L152 18ZM360 10L350 22L370 22ZM50 14L42 24L58 24Z' fill='%23f1f5f9'/%3E%3Cg fill='%233f5e4a'%3E%3Cpath d='M20 64L30 40L40 64ZM34 64L44 46L54 64ZM180 64L192 36L204 64ZM300 64L310 42L320 64ZM316 64L326 48L336 64Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+#fishing-screen[data-region="coast"] .rg-shore {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 64'%3E%3Cpath d='M0 64V56H400V64Z' fill='%239ca3af'/%3E%3Cpath d='M0 56L10 52H400V56Z' fill='%23d1d5db'/%3E%3Cg%3E%3Crect x='326' y='22' width='10' height='34' fill='%23f8fafc'/%3E%3Crect x='326' y='30' width='10' height='5' fill='%23dc2626'/%3E%3Crect x='326' y='42' width='10' height='5' fill='%23dc2626'/%3E%3Cpath d='M324 22H338L331 14Z' fill='%23dc2626'/%3E%3Ccircle cx='331' cy='19' r='2' fill='%23fde047'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 800px 64px;
+}
+
+/* ----------------------------------------
+   ラウンド開始の演出
+   ---------------------------------------- */
+.rg-round-intro {
+    min-width: 240px;
+    max-width: 88vw;
+    position: absolute;
+    top: 38%;
+    left: 50%;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 28px;
+    color: #fff;
+    text-align: center;
+    background: rgba(28, 20, 16, 0.78);
+    border: 3px solid #8d6e63;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    transform: translate(-50%, -50%);
+    animation: rgIntroIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.rg-round-intro.hide {
+    opacity: 0;
+    transform: translate(-50%, -60%);
+}
+
+@keyframes rgIntroIn {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.rg-intro-region {
+    font-size: 13px;
+    color: var(--accent-color);
+}
+
+.rg-intro-round {
+    white-space: nowrap;
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: var(--accent-yellow);
+    text-shadow: 2px 2px 0 #4e342e;
+}
+
+.rg-intro-spot {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.rg-intro-detail {
+    font-size: 14px;
+}
+
+/* 効果のタグ（得は緑、損は赤） */
+.rg-tags,
+.rg-intro-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+}
+
+.rg-tag {
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.rg-tag.good { color: #052e16; background: #86efac; }
+.rg-tag.bad { color: #450a0a; background: #fca5a5; }
+
+/* 釣り場カード: 背景を天候の空の色に */
+.rg-area-row.rg-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.rg-area-card {
+    position: relative;
+    padding: 8px;
+    gap: 3px;
+}
+
+.rg-area-card .rg-area-name {
+    font-size: 14px;
+    line-height: 1.25;
+}
+
+.rg-area-card .rg-tags {
+    justify-content: flex-start;
+}
+
+.rg-area-high {
+    font-size: 12px;
+    color: #fde68a;
+}
+
+.rg-weather-clear { background: linear-gradient(135deg, #0284c7, #0369a1); border-color: #0c4a6e; }
+.rg-weather-calm { background: linear-gradient(135deg, #0d9488, #115e59); border-color: #134e4a; box-shadow: 0 4px 0 #134e4a; }
+.rg-weather-storm { background: linear-gradient(135deg, #4b5563, #1f2937); border-color: #111827; box-shadow: 0 4px 0 #111827; }
+.rg-weather-treasure { background: linear-gradient(135deg, #ea580c, #9a3412); border-color: #7c2d12; box-shadow: 0 4px 0 #7c2d12; }
+.rg-weather-moon { background: linear-gradient(135deg, #3730a3, #1e1b4b); border-color: #1e1b4b; box-shadow: 0 4px 0 #1e1b4b; }
+.rg-weather-school { background: linear-gradient(135deg, #db2777, #9d174d); border-color: #831843; box-shadow: 0 4px 0 #831843; }
+
+.rg-new-badge {
+    position: absolute;
+    top: -8px;
+    right: -4px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 900;
+    color: #3e2723;
+    background: var(--accent-yellow);
+    border-radius: 8px;
+}

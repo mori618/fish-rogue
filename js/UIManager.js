@@ -69,7 +69,7 @@ const UIManager = {
         if (record) {
             const meta = SaveManager.loadMeta();
             record.textContent = meta.totalRuns > 0
-                ? `最高記録: ラウンド${meta.bestRound} クリア${meta.clears > 0 ? ` ／ 航海達成 ${meta.clears}回` : ''}`
+                ? `最高記録: ラウンド${meta.bestRound} クリア${meta.clears > 0 ? ` ／ 釣り旅達成 ${meta.clears}回` : ''}`
                 : '';
         }
     },
@@ -158,7 +158,7 @@ const UIManager = {
         if (returnBtn) returnBtn.classList.toggle('hidden', !(run.reached && run.phase === 'fishing'));
     },
 
-    // パワー以外のチップ（コンボ・海域）
+    // パワー以外のチップ（コンボ・釣り場）
     updateChips() {
         const run = GameState.run;
         if (!run) return;
@@ -171,11 +171,40 @@ const UIManager = {
         }
 
         const areaChip = document.getElementById('area-chip');
-        const area = GameState.getCurrentArea();
-        if (areaChip && area) {
-            areaChip.innerHTML = `<span class="material-icons">${area.icon}</span><span>${area.name}</span>`;
-            areaChip.title = area.description;
+        const weather = GameState.getCurrentWeather();
+        if (areaChip && weather) {
+            areaChip.innerHTML = `<span class="material-icons">${weather.icon}</span><span>${GameState.getSpotDisplayName()}</span>`;
+            areaChip.title = weather.description;
         }
+    },
+
+    // ラウンド開始: 画面中央に「ROUND 3 嵐の堤防」を1秒ほど出す
+    showRoundIntro() {
+        const run = GameState.run;
+        if (!run) return;
+        const region = GameState.getCurrentRegion();
+        const weather = GameState.getCurrentWeather();
+        const highValue = GAME_DATA.FISH.find(f => f.id === run.highValue);
+        const supply = GAME_DATA.BAITS.find(b => b.id === run.supply.id);
+
+        document.querySelectorAll('.rg-round-intro').forEach(el => el.remove());
+        const intro = document.createElement('div');
+        intro.className = 'rg-round-intro';
+        intro.innerHTML = `
+            <div class="rg-intro-region">${region ? region.name : ''}</div>
+            <div class="rg-intro-round">ROUND ${run.round}</div>
+            <div class="rg-intro-spot">${GameState.getSpotDisplayName()}</div>
+            <div class="rg-intro-detail">目標 ${run.target.toLocaleString()} G ／ ${supply.name}×${run.supply.count}</div>
+            ${highValue ? `<div class="rg-intro-detail">本日の高値: ${highValue.name}</div>` : ''}
+            ${weather && weather.tags.length ? `<div class="rg-intro-tags">${weather.tags.map(t => `<span class="rg-tag ${t.good ? 'good' : 'bad'}">${t.text}</span>`).join('')}</div>` : ''}
+        `;
+        intro.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            intro.remove();
+        });
+        document.getElementById('fishing-screen').appendChild(intro);
+        setTimeout(() => intro.classList.add('hide'), 1600);
+        setTimeout(() => intro.remove(), 2100);
     },
     // 餌セレクター（所持している餌の切り替えと残り数）
     updateBaitInfo() {
@@ -590,7 +619,12 @@ const UIManager = {
         // Original was #87CEEB 0%, #3b82f6 30%. It was a smooth transition from sky to light blue ocean.
         // To keep the sky distinct but connected:
 
-        const newGradient = `linear-gradient(180deg, ${skyTop} 0%, ${skyBottom} 30%, #1e3a8a 100%)`;
+        // 水の色と岸辺の景色は水域ごとに変える（池の緑、川の青、沿岸、外洋の紺）
+        const region = GameState.getCurrentRegion();
+        const water = region ? region.water : ['#3b82f6', '#1e3a8a'];
+        fishingScreen.dataset.region = region ? region.id : '';
+
+        const newGradient = `linear-gradient(180deg, ${skyTop} 0%, ${skyBottom} 29.5%, ${water[0]} 30%, ${water[1]} 100%)`;
 
         fishingScreen.style.background = newGradient;
     },

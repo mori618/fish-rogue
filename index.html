@@ -35,7 +35,7 @@
             <div class="start-buttons">
                 <button id="start-btn" class="btn-main">
                     <span class="btn-icon">▶</span>
-                    新しい航海
+                    新しい釣り旅
                 </button>
                 <button id="continue-btn" class="btn-main btn-continue hidden">
                     <span class="btn-icon">↻</span>
@@ -91,10 +91,13 @@
             </div>
         </main>
 
+        <!-- 岸辺の景色（水域ごとに変わる） -->
+        <div class="rg-shore" aria-hidden="true"></div>
+
         <!-- 竿・糸・ウキ・水面の演出（RodAnimator が描く） -->
         <svg id="rod-scene" class="rg-rod-scene" aria-hidden="true"></svg>
 
-        <!-- 下部HUD: 操作（装備・帰港・餌の選択）を親指の届く場所に -->
+        <!-- 下部HUD: 操作（装備・宿へ戻る・餌の選択）を親指の届く場所に -->
         <div class="bottom-hud-center rg-hud-bottom">
             <div class="rg-hud-actions">
                 <button id="build-btn" class="floating-btn btn-town rg-small-btn">
@@ -104,7 +107,7 @@
                 <div id="bait-total" class="rg-bait-total"></div>
                 <button id="return-btn" class="floating-btn btn-town rg-small-btn rg-return-btn hidden">
                     <span class="material-icons">anchor</span>
-                    <span class="btn-label">帰港</span>
+                    <span class="btn-label">宿へ戻る</span>
                 </button>
             </div>
             <div id="bait-info" class="rg-bait-slots"></div>
@@ -123,7 +126,7 @@
 
             <div class="help-tabs">
                 <button class="help-tab active" data-target="help-fishing">釣り</button>
-                <button class="help-tab" data-target="help-run">航海のルール</button>
+                <button class="help-tab" data-target="help-run">釣り旅のルール</button>
                 <button class="help-tab" data-target="help-growth">強化</button>
             </div>
 
@@ -150,19 +153,20 @@
                 </div>
 
                 <div id="help-run" class="help-section">
-                    <h3>⛵ 航海のルール</h3>
+                    <h3>⛵ 釣り旅のルール</h3>
                     <ul class="help-simple-list">
                         <li><strong>目標:</strong> 各ラウンドで、釣った魚の水揚げ額を目標額まで稼ぎます。釣った魚は自動で売却されます。</li>
                         <li><strong>餌:</strong> 一投ごとに餌を1つ使います（釣れなくても減ります）。毎ラウンド10個支給され、ラウンドが進むと支給される餌のランクが上がります。</li>
-                        <li><strong>ゲームオーバー:</strong> 目標に届かないまま餌がすべて尽きると航海は終わりです。</li>
-                        <li><strong>帰港と評価:</strong> 目標に届いたら、いつでも「帰港」できます。粘って目標の1.5倍で「銀」、2倍で「金」になり、報酬が良くなります。餌が尽きると自動で帰港します。</li>
+                        <li><strong>ゲームオーバー:</strong> 目標に届かないまま餌がすべて尽きると釣り旅は終わりです。</li>
+                        <li><strong>宿へ戻る:</strong> 目標に届いたら、いつでも宿へ戻れます。粘って目標の1.5倍で評価「銀」、2倍で「金」になり、報酬が良くなります。餌が尽きると自動で宿へ戻ります。</li>
                         <li><strong>コンボ:</strong> 続けて釣り上げるたびに売値+10%（最大+50%）。失敗すると途切れます。</li>
-                        <li><strong>海域:</strong> 港を出るときに2つの海域から1つを選びます。海域ごとに目標額と効果が変わります。</li>
+                        <li><strong>水域の旅:</strong> 里の水辺（R1〜3）→ 川と湖（R4〜6）→ 沿岸（R7〜9）→ 外洋（R10〜）と進みます。釣り宿では、その水域の3つの釣り場から1つを選んで出発します。</li>
+                        <li><strong>釣り場:</strong> 釣り場ごとによく釣れる魚が違います。天候で目標額と効果が変わり、「本日の高値」の魚は売値が2倍です。</li>
                     </ul>
                 </div>
 
                 <div id="help-growth" class="help-section">
-                    <h3>✨ 港での強化</h3>
+                    <h3>✨ 釣り宿での強化</h3>
                     <div class="feature-card">
                         <h4>🎁 報酬スキル</h4>
                         <p>ラウンドをクリアするたびに、3つの中からスキルを1つもらえます。</p>
@@ -185,11 +189,11 @@
     </div>
 
     <!-- ========================================
-         港画面（ラウンド間の報酬・買い物・装備）
+         釣り宿画面（ラウンド間の報酬・買い物・装備）
          ======================================== -->
     <div id="harbor-screen" class="screen">
         <header class="shop-header">
-            <h2 class="shop-title"><span class="material-icons">anchor</span> <span id="harbor-title">港</span></h2>
+            <h2 class="shop-title"><span class="material-icons">cottage</span> <span id="harbor-title">釣り宿</span></h2>
             <div class="shop-money">
                 <span class="status-icon"><span class="material-icons">paid</span></span>
                 <span id="shop-money-display">0 G</span>

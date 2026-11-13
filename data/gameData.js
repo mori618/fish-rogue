@@ -1090,38 +1090,84 @@ const ROGUE_CONFIG = {
     skyByRound: ['sky_default', 'sky_default', 'sky_sunset', 'sky_sunset', 'sky_night', 'sky_night',
         'sky_cherry', 'sky_storm', 'sky_aurora', 'sky_galaxy'],
 
-    // --- 海域（港で2つ提示され、選んだ方へ出航する） ---
-    // effects はその海域にいる間だけ装備される見えないスキルとして扱う
-    areaChoices: 2,
-    areas: [
+    // --- 天候（釣り宿で釣り場ごとにランダムで決まる。旧「海域」の効果） ---
+    // effects はその天候の間だけ装備される見えないスキルとして扱う
+    // tags は釣り場カードに出す短い説明（good: 得なら true）
+    weathers: [
         {
-            id: 'calm', name: '穏やかな湾', icon: 'beach_access', sky: 'sky_default', targetMult: 0.8,
+            id: 'clear', name: '晴れ', prefix: '', icon: 'wb_sunny', sky: null, targetMult: 1.0,
+            description: '特別な効果はない', effects: [], tags: []
+        },
+        {
+            id: 'calm', name: '凪', prefix: '凪の', icon: 'beach_access', sky: 'sky_default', targetMult: 0.8,
             description: 'ゲージが遅い。報酬スキルの選択肢が1つ減る',
-            effects: [{ type: 'gauge_slow', value: 0.2 }], rewardChoicesDelta: -1
+            effects: [{ type: 'gauge_slow', value: 0.2 }], rewardChoicesDelta: -1,
+            tags: [{ text: 'ゲージ遅い', good: true }, { text: '報酬-1', good: false }]
         },
         {
-            id: 'offshore', name: '沖合', icon: 'sailing', sky: null, targetMult: 1.0,
-            description: '特別な効果はない', effects: []
-        },
-        {
-            id: 'storm', name: '嵐の海', icon: 'thunderstorm', sky: 'sky_storm', targetMult: 1.2,
+            id: 'storm', name: '嵐', prefix: '嵐の', icon: 'thunderstorm', sky: 'sky_storm', targetMult: 1.2,
             description: 'ゲージが速い。魚の売値+30%',
-            effects: [{ type: 'gauge_slow', value: -0.25 }, { type: 'price_boost', value: 0.3 }]
+            effects: [{ type: 'gauge_slow', value: -0.25 }, { type: 'price_boost', value: 0.3 }],
+            tags: [{ text: '売値+30%', good: true }, { text: 'ゲージ速い', good: false }]
         },
         {
-            id: 'cove', name: '宝の入り江', icon: 'diamond', sky: 'sky_sunset', targetMult: 1.0,
+            id: 'treasure', name: 'お宝日和', prefix: '宝眠る', icon: 'diamond', sky: 'sky_sunset', targetMult: 1.0,
             description: '宝箱の出現率+15%。魚の売値-30%',
-            effects: [{ type: 'treasure_boost', value: 0.15 }, { type: 'price_boost', value: -0.3 }]
+            effects: [{ type: 'treasure_boost', value: 0.15 }, { type: 'price_boost', value: -0.3 }],
+            tags: [{ text: '宝箱+15%', good: true }, { text: '売値-30%', good: false }]
         },
         {
-            id: 'moon', name: '月夜の海', icon: 'nightlight', sky: 'sky_night', targetMult: 1.1,
+            id: 'moon', name: '月夜', prefix: '月夜の', icon: 'nightlight', sky: 'sky_night', targetMult: 1.1,
             description: '月のフィーバーゲージが4から始まる。待ち時間+30%',
-            effects: [{ type: 'wait_time_reduction', value: -0.3 }], startFever: { type: 'moon', value: 4 }
+            effects: [{ type: 'wait_time_reduction', value: -0.3 }], startFever: { type: 'moon', value: 4 },
+            tags: [{ text: '月フィーバー間近', good: true }, { text: '待ち長い', good: false }]
         },
         {
-            id: 'school', name: '群れの潮', icon: 'waves', sky: 'sky_cherry', targetMult: 1.0,
+            id: 'school', name: '群れ', prefix: '群れ来る', icon: 'waves', sky: 'sky_cherry', targetMult: 1.0,
             description: '2匹釣りの確率+30%。餌より上のランクが出ない',
-            effects: [{ type: 'multi_catch_2', value: 0.3 }], noUpperRank: true
+            effects: [{ type: 'multi_catch_2', value: 0.3 }], noUpperRank: true,
+            tags: [{ text: '2匹釣り+30%', good: true }, { text: '大物なし', good: false }]
+        }
+    ],
+
+    // --- 水域と釣り場（水域はラウンドで決まり、釣り宿でその水域の釣り場を1つ選ぶ） ---
+    //   fish: その釣り場でよく釣れる魚（同じランクの中で出やすさが favoredWeight 倍）
+    //   rankBoost: ランクの出やすさの上乗せ（海溝の深海魚など）
+    //   water: 釣り画面の水の色（水面, 水底）
+    favoredWeight: 3,
+    highValueMult: 2,               // 「本日の高値」の魚の売値倍率
+    regions: [
+        {
+            id: 'village', name: '里の水辺', from: 1, water: ['#4f9d7e', '#1f4d3c'],
+            spots: [
+                { id: 'paddy', name: '田んぼ', fish: ['fish_d9', 'fish_d8', 'fish_d5'] },
+                { id: 'brook', name: '小川', fish: ['fish_d1', 'fish_d3', 'fish_d7'] },
+                { id: 'pond', name: 'ため池', fish: ['fish_d2', 'fish_d4', 'fish_d6'] }
+            ]
+        },
+        {
+            id: 'river', name: '川と湖', from: 4, water: ['#3d8fc4', '#1b4a72'],
+            spots: [
+                { id: 'stream', name: '渓流', fish: ['fish_c2', 'fish_c3', 'fish_c1'] },
+                { id: 'lake', name: '湖', fish: ['fish_c6', 'fish_c7', 'fish_c4'] },
+                { id: 'midstream', name: '中流', fish: ['fish_c8', 'fish_c5'] }
+            ]
+        },
+        {
+            id: 'coast', name: '沿岸', from: 7, water: ['#3b82f6', '#1e3a8a'],
+            spots: [
+                { id: 'pier', name: '堤防', fish: ['fish_b7', 'fish_b4', 'fish_b5'] },
+                { id: 'rocks', name: '磯', fish: ['fish_b1', 'fish_b2'] },
+                { id: 'rip', name: '潮目', fish: ['fish_b6', 'fish_b3'] }
+            ]
+        },
+        {
+            id: 'ocean', name: '外洋', from: 10, water: ['#2563eb', '#0b1a4a'],
+            spots: [
+                { id: 'offshore', name: '沖', fish: ['fish_a1', 'fish_a2', 'fish_a5'] },
+                { id: 'deep', name: '深場', fish: ['fish_a4', 'fish_a3', 'fish_a6'] },
+                { id: 'trench', name: '海溝', fish: ['fish_s3', 'fish_s1', 'fish_s2'], rankBoost: { S: 0.05 } }
+            ]
         }
     ]
 };

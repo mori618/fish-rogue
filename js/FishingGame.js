@@ -207,9 +207,17 @@ const FishingGame = {
             currentWeights = { ...(feverWeights[bait.rank] || feverWeights['D']) };
         }
 
-        // 海域「群れの潮」: 餌より上のランクは出ない
-        const area = GameState.getCurrentArea();
-        if (area && area.noUpperRank) {
+        // 釣り場のランクの上乗せ（海溝の深海魚など）
+        const spot = GameState.getCurrentSpot();
+        if (spot && spot.rankBoost) {
+            Object.entries(spot.rankBoost).forEach(([rank, w]) => {
+                currentWeights[rank] = (currentWeights[rank] || 0) + w;
+            });
+        }
+
+        // 天候「群れ」: 餌より上のランクは出ない
+        const weather = GameState.getCurrentWeather();
+        if (weather && weather.noUpperRank) {
             Object.keys(currentWeights).forEach(rank => {
                 if (this.RANK_INDEX[rank] > this.RANK_INDEX[bait.rank]) delete currentWeights[rank];
             });
@@ -296,8 +304,11 @@ const FishingGame = {
         const rareBonus = GameState.getRareBonus();
 
         // プールの各魚に重みを適用
+        const favored = spot ? spot.fish : [];
         const weightedPool = fishPool.map(f => {
             let effectiveWeight = f.weight;
+            // 釣り場でよく釣れる魚
+            if (favored.includes(f.id)) effectiveWeight *= GAME_DATA.ROGUE_CONFIG.favoredWeight;
             // weight < 15 は「あまり釣れない」以下 (頻度プロパティ連携)
             if (rareBonus > 0 && f.weight < 15) {
                 // ボーナスを適用 (効果を実感しやすくするため係数を2.0とする)
@@ -754,7 +765,7 @@ const FishingGame = {
     },
 
     // ========================================
-    // 捕獲率の計算（ゲージ表示・港の目安・判定で共通）
+    // 捕獲率の計算（ゲージ表示・釣り宿の目安・判定で共通）
     // ========================================
     // 対戦の格付け: 余裕 / 互角 / 格上 / 無謀
     getMatchup(fish, power = GameState.getTotalPower()) {
@@ -800,7 +811,7 @@ const FishingGame = {
         return ['S', 'SS'].includes(fish.rarity) ? one * one : one;  // S以上は2連戦
     },
 
-    // 餌1つで1匹釣れる確率の目安（港の表示用）
+    // 餌1つで1匹釣れる確率の目安（釣り宿の表示用）
     estimateBaitSuccess(baitId, power = GameState.getTotalPower()) {
         const bait = GAME_DATA.BAITS.find(b => b.id === baitId);
         const weights = this.SPAWN_WEIGHTS[bait.rank];

@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     on('start-btn', () => {
         if (SaveManager.hasSaveData() &&
-            !window.confirm('進行中の航海があります。破棄して新しく始めますか？')) {
+            !window.confirm('進行中の釣り旅があります。破棄して新しく始めますか？')) {
             return;
         }
         RunManager.startNewRun();
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     on('encyclopedia-btn', () => {
-        // 航海を始める前でも図鑑を見られるよう、メタデータから読み込む
+        // 釣り旅を始める前でも図鑑を見られるよう、メタデータから読み込む
         GameState.encyclopedia = { ...SaveManager.loadMeta().encyclopedia };
         UIManager.showScreen('encyclopedia');
     });
