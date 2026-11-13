@@ -90,11 +90,8 @@
             </div>
         </main>
 
-        <!-- 1人称視点の釣り竿 -->
-        <div id="fishing-rod-view" class="fishing-rod-view">
-            <div class="rod-shaft"></div>
-            <div class="rod-line"></div>
-        </div>
+        <!-- 竿・糸・ウキ・水面の演出（RodAnimator が描く） -->
+        <svg id="rod-scene" class="rg-rod-scene" aria-hidden="true"></svg>
 
         <!-- 下部HUD: 操作（装備・帰港・餌の選択）を親指の届く場所に -->
         <div class="bottom-hud-center rg-hud-bottom">
@@ -235,6 +232,7 @@
     <script src="js/SaveManager.js"></script>
     <script src="js/GameState.js"></script>
     <script src="js/FishingGame.js"></script>
+    <script src="js/RodAnimator.js"></script>
     <script src="js/RunManager.js"></script>
     <script src="js/EncyclopediaManager.js"></script>
     <script src="js/UIManager.js"></script>

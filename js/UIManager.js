@@ -29,13 +29,19 @@ const UIManager = {
             document.body.dataset.screen = screenId;
         }
 
+        // 竿の描画ループは釣り画面にいる間だけ動かす
+        if (screenId !== 'fishing') RodAnimator.stop();
+
         // 画面固有の初期化
         if (screenId === 'start') {
             this.initStartScreen();
         } else if (screenId === 'fishing') {
+            RodAnimator.start();
             this.showIdle();
             this.updateStatus();
             this.updateSkyVisuals();
+            // 下部HUDの中身が入って高さが決まってから、竿の位置を合わせる
+            RodAnimator.resize();
         } else if (screenId === 'harbor') {
             HarborUI.render();
         } else if (screenId === 'encyclopedia') {
@@ -201,25 +207,10 @@ const UIManager = {
     // ========================================
     // 釣り竿の状態更新
     // ========================================
-    updateRodView(state) {
-        const rodView = document.getElementById('fishing-rod-view');
-        if (!rodView) return;
-
-        rodView.className = 'fishing-rod-view';
-        if (state) {
-            rodView.classList.add(state);
-        }
-
-        // スキル色を適用
-        const skin = GameState.getCurrentSkin();
-        const rodShaft = rodView.querySelector('.rod-shaft');
-        if (rodShaft) {
-            rodShaft.style.backgroundColor = skin.rodColor;
-            // 枠線の色も少し暗くして調整（簡易的）
-            rodShaft.style.borderColor = skin.rodColor;
-        }
+    updateRodView(state, options = {}) {
+        // 竿・糸・ウキの描画は RodAnimator が担当する。ここは状態名を渡すだけ
+        RodAnimator.setState(state || 'idle', options);
     },
-
     // ========================================
     // 釣り画面: キャスト
     // ========================================
@@ -227,15 +218,10 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        fishingArea.innerHTML = `
-            <div class="casting-state">
-                <div class="instruction">キャスト中...</div>
-            </div>
-        `;
-
+        // キャスト中は文字を出さず、竿の振りとウキの飛ぶ様子を見せる
+        fishingArea.innerHTML = '';
         this.updateRodView('casting');
     },
-
     // ========================================
     // 釣り画面: 待機（ウキ静止）
     // ========================================
@@ -243,23 +229,9 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        const skin = GameState.getCurrentSkin();
-
-        fishingArea.innerHTML = `
-            <div class="waiting-state">
-                <div class="water-surface">
-                    <div class="bobber waiting">
-                        <div class="bobber-stick"></div>
-                        <div class="bobber-body" style="background-color: ${skin.bobberColor}"></div>
-                    </div>
-                    <div class="ripple"></div>
-                </div>
-            </div>
-        `;
-
+        fishingArea.innerHTML = '';
         this.updateRodView('waiting');
     },
-
     // ========================================
     // 釣り画面: 予兆（ウキ揺れ）
     // ========================================
@@ -267,39 +239,17 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        const skin = GameState.getCurrentSkin();
-
-        fishingArea.innerHTML = `
-            <div class="nibble-state">
-                <div class="water-surface">
-                    <div class="bobber">
-                        <div class="bobber-stick"></div>
-                        <div class="bobber-body" style="background-color: ${skin.bobberColor}"></div>
-                    </div>
-                    <div class="ripple active" style="transform: scale(${scale});"></div>
-                </div>
-            </div>
-        `;
-
+        fishingArea.innerHTML = '';
+        // 沈みの深さと魚影の大きさに使う（餌より上のランクの魚ほど大きい）
+        this.nibbleScale = scale;
         this.updateRodView('nibble');
     },
-
     // ========================================
     // ウキの揺れを1回分実行
     // ========================================
-    triggerBobberShake(durationMs) {
-        const bobber = document.querySelector('.bobber');
-        if (!bobber) return;
-
-        // アニメーションをリセットして実行
-        bobber.classList.remove('nibbling');
-        void bobber.offsetWidth; // 強制リフロー
-
-        bobber.style.animationDuration = `${durationMs / 1000}s`;
-        bobber.style.animationIterationCount = '1';
-        bobber.classList.add('nibbling');
+    triggerBobberShake() {
+        RodAnimator.nibble(this.nibbleScale || 1);
     },
-
     // ========================================
     // 釣り画面: ヒット
     // ========================================
@@ -307,21 +257,9 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        const skin = GameState.getCurrentSkin();
-
-        fishingArea.innerHTML = `
-            <div class="hit-state">
-                <div class="water-surface">
-                    <div class="bobber sinking">
-                        <div class="bobber-stick"></div>
-                        <div class="bobber-body" style="background-color: ${skin.bobberColor}"></div>
-                    </div>
-                    <div class="splash"></div>
-                </div>
-            </div>
-        `;
-
-        this.updateRodView('hit');
+        fishingArea.innerHTML = '';
+        const fish = FishingGame.currentFish;
+        this.updateRodView('hit', { rarity: fish ? fish.rarity : 'D' });
 
         // 画面シェイクとバイブレーションを発生させる
         this.shakeScreen();
@@ -329,7 +267,6 @@ const UIManager = {
             navigator.vibrate([100]); // 100msのバイブレーション
         }
     },
-
     // ========================================
     // 画面を一時的に揺らす（スクリーンシェイク）
     // ========================================
@@ -351,8 +288,11 @@ const UIManager = {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
-        // 竿をバトル状態（奮闘中）にする
-        this.updateRodView('battle');
+        // 竿をバトル状態にする（力関係で、しなりの強さと竿先の震えが変わる）
+        this.updateRodView('battle', {
+            rarity: fish.rarity,
+            matchup: info ? info.matchup.id : 'even'
+        });
 
         // ゾーンの位置を計算（中央に赤ゾーン）
         const centerStart = (100 - redZoneWidth) / 2;
@@ -405,6 +345,8 @@ const UIManager = {
         if (indicator) {
             indicator.style.left = `${position}%`;
         }
+        // 針が赤ゾーンに近いほど竿が大きくしなる
+        RodAnimator.setGauge(position);
     },
 
     // ========================================
@@ -524,6 +466,8 @@ const UIManager = {
     // 釣り上げ失敗
     // ========================================
     showCatchFailed(fish, onClose, reason = '') {
+        this.updateRodView('fail');
+
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
 
@@ -709,8 +653,8 @@ const UIManager = {
                 <div class="missed-text">${message}</div>
             </div>
         `;
+        this.updateRodView('fail');
     },
-
     // ========================================
     // 釣り竿情報更新
     // ========================================

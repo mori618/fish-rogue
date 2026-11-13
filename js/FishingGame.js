@@ -886,6 +886,9 @@ const FishingGame = {
 
         const fish = this.currentFish;
 
+        // 竿を立てて、魚（宝箱）が水面から跳ねる
+        UIManager.updateRodView('success', { rarity: fish.rarity, treasure: !!fish.isTreasure });
+
         // 餌を消費
         GameState.useBait(true);
         UIManager.updateBaitInfo();

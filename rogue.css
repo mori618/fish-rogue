@@ -208,6 +208,24 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 /* ----------------------------------------
+   釣り画面: ロッドシーン（竿・糸・ウキ。js/RodAnimator.js が描く）
+   ---------------------------------------- */
+.rg-rod-scene {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+    pointer-events: none;
+    overflow: visible;
+}
+
+/* 案内文やゲージは竿より手前に出す */
+.fishing-area {
+    z-index: 6;
+}
+
+/* ----------------------------------------
    釣り画面: 下部HUD（装備・帰港・餌スロット）
    ---------------------------------------- */
 .rg-hud-bottom {

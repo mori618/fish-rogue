@@ -53,6 +53,7 @@
 | `js/GameState.js` | 航海中のプレイヤー状態と、スキル効果の計算 |
 | `js/FishingGame.js` | 釣りの1サイクル（キャスト〜ゲージバトル〜結果） |
 | `js/UIManager.js` | 釣り画面の表示・演出 |
+| `js/RodAnimator.js` | 竿・糸・ウキ・水面の演出を1枚のSVGに描く。動きの調整値は先頭の `CONFIG` |
 | `js/SaveManager.js` | 航海データとメタデータ（図鑑・最高記録）の保存 |
 | `js/EncyclopediaManager.js` | 魚図鑑 |
 | `styles.css` / `rogue.css` | 原作のスタイル／ローグライト版で追加したスタイル |
