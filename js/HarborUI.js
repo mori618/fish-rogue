@@ -13,21 +13,90 @@ const HarborUI = {
     render() {
         const run = GameState.run;
         const main = document.getElementById('harbor-main');
-        if (!main || !run || !run.harbor) return;
+        if (!run || !run.harbor || !main) return;
 
         const harbor = run.harbor;
         document.getElementById('harbor-title').textContent = `釣り宿 ― R${run.round} クリア`;
         UIManager.updateMoney();
 
-        main.innerHTML = this.buildHtml() + (harbor.rewardTaken
-            ? this.shopHtml(harbor)
-            : this.summaryHtml(harbor.summary) + this.rewardHtml(harbor));
-
+        let body;
+        if (harbor.nushiOptions && harbor.nushiOptions.length && !harbor.nushiTaken) {
+            body = this.summaryHtml(harbor.summary) + this.nushiRewardHtml(harbor);
+        } else if (!harbor.rewardTaken) {
+            body = this.summaryHtml(harbor.summary) + this.rewardHtml(harbor);
+        } else {
+            body = this.shopHtml(harbor);
+        }
+        main.innerHTML = this.buildHtml() + body;
+        // 報酬 → ショップに切り替わったら先頭に戻す
+        const phaseKey = `${run.round}|${harbor.nushiTaken}|${harbor.rewardTaken}`;
+        const scroller = main.closest('.shop-content');
+        if (scroller && this._phaseKey !== phaseKey) scroller.scrollTop = 0;
+        this._phaseKey = phaseKey;
         document.getElementById('harbor-next').innerHTML = this.areaHtml(harbor);
+
+        // 着いた直後だけ、評価のメダルと稼ぎのカウントアップを見せる
+        if (!harbor.arrivalShown) {
+            harbor.arrivalShown = true;
+            SaveManager.save();
+            this.showArrival(harbor.summary);
+        }
     },
 
     // ----------------------------------------
-    // ビルド帯（竿・パワー・スキル。アイコンをタップで詳細）
+    // 到着演出: 評価メダルを大きく出し、水揚げとボーナスを数え上げる（1.2秒、タップで飛ばせる）
+    // ----------------------------------------
+    showArrival(summary) {
+        const grade = GAME_DATA.ROGUE_CONFIG.grades.find(g => g.id === summary.grade);
+        const total = summary.earned + summary.clearBonus + summary.leftoverBonus;
+        const overlay = document.createElement('div');
+        overlay.className = `rg-arrival rg-grade-${grade.id}`;
+        overlay.innerHTML = `
+            <div class="rg-arrival-medal"><span>${grade.name}</span></div>
+            <div class="rg-arrival-rows">
+                <div><span>水揚げ</span><strong data-to="${summary.earned}">0</strong></div>
+                <div><span>クリアボーナス</span><strong data-to="${summary.clearBonus}">0</strong></div>
+                <div><span>余った餌 ×${summary.leftover}</span><strong data-to="${summary.leftoverBonus}">0</strong></div>
+                <div class="rg-arrival-total"><span>合計</span><strong data-to="${total}">0</strong></div>
+            </div>
+            <div class="rg-arrival-hint">タップで閉じる</div>
+        `;
+        document.body.appendChild(overlay);
+
+        const nums = [...overlay.querySelectorAll('[data-to]')];
+        const duration = 1200;
+        const start = performance.now();
+        let done = false;
+        const set = t => nums.forEach(el => {
+            el.textContent = `${Math.round(Number(el.dataset.to) * t).toLocaleString()} G`;
+        });
+        const step = now => {
+            if (done) return;
+            const t = Math.min(1, (now - start) / duration);
+            set(1 - Math.pow(1 - t, 3));
+            if (t < 1) requestAnimationFrame(step);
+            else overlay.classList.add('rg-done');
+        };
+        requestAnimationFrame(step);
+
+        const close = () => {
+            if (!done) {
+                // 1回目のタップは数え上げを終わらせる。2回目で閉じる
+                done = true;
+                set(1);
+                overlay.classList.add('rg-done');
+                return;
+            }
+            overlay.classList.add('rg-hide');
+            setTimeout(() => overlay.remove(), 250);
+        };
+        overlay.addEventListener('click', close);
+        // 放っておいても数え上げの後に自動で閉じる
+        setTimeout(() => { done = true; close(); }, duration + 1600);
+    },
+
+    // ----------------------------------------
+    // ビルド帯（竿・パワー・スキル・系統。アイコンをタップで詳細）
     // ----------------------------------------
     buildHtml() {
         const slots = GameState.getSkillSlots();
@@ -35,8 +104,8 @@ const HarborUI = {
 
         const icon = (id, extra = '') => {
             const skill = GameState.getSkillData(id);
-            return `<button class="rg-skill-chip rg-tier-${skill.tier} ${extra}" onclick="HarborUI.showSkill('${id}', ${extra ? 'false' : 'true'})" title="${skill.name}">
-                <span class="material-icons">${skill.icon || 'auto_fix_high'}</span>
+            return `<button class="rg-skill-chip rg-tier-${skill.tier} ${extra}" data-skill="${id}" onclick="HarborUI.showSkill('${id}', ${extra.includes('rg-benched') ? 'false' : 'true'})" title="${skill.name}">
+                <span class="material-icons">${this.skillIcon(skill)}</span>
             </button>`;
         };
 
@@ -58,17 +127,77 @@ const HarborUI = {
             <section class="rg-build">
                 <div class="rg-build-head">
                     <span title="${GameState.getRodType().description}">${GameState.getRodDisplayName()} <span class="rg-stars">${'★'.repeat(GameState.rodStars)}</span></span>
-                    <span>パワー <strong>${GameState.getTotalPower()}</strong></span>
+                    <span>パワー <strong id="harbor-power">${GameState.getTotalPower()}</strong></span>
                     <span>スロット ${equipped.length}/${slots}</span>
                 </div>
                 <div class="rg-skill-row">${equippedIcons}${emptyIcons}</div>
                 ${bench}
+                ${this.familyHtml()}
             </section>
         `;
     },
 
+    // 系統の進み具合（1つ以上あるものだけ）
+    familyHtml() {
+        const counts = GameState.getFamilyCounts();
+        const chips = GAME_DATA.ROGUE_CONFIG.families.filter(f => counts[f.id] > 0).map(f => {
+            const n = counts[f.id];
+            const next = n >= 4 ? null : (n >= 2 ? 4 : 2);
+            const state = n >= 4 ? 'rg-max' : (n >= 2 ? 'rg-on' : '');
+            const hint = next ? (next - n === 1 ? 'あと1つで発動' : `${next}つで発動`) : '全開';
+            const active = [n >= 2 ? f.bonus2.text : null, n >= 4 ? f.bonus4.text : null].filter(Boolean).join(' / ');
+            return `<button class="rg-family-chip ${state}" onclick="HarborUI.showFamily('${f.id}')">
+                <span class="material-icons">${f.icon}</span>${f.name} <strong>${n}</strong>
+                <small>${active || hint}</small>
+            </button>`;
+        }).join('');
+        return chips ? `<div class="rg-family-row">${chips}</div>` : '';
+    },
+
+    showFamily(familyId) {
+        const f = GAME_DATA.ROGUE_CONFIG.families.find(x => x.id === familyId);
+        const n = GameState.getFamilyCounts()[familyId];
+        const rod = f.rodType ? GameState.getRodType(f.rodType).name : null;
+        const overlay = this.openModal('family-modal', `
+            <div class="modal-header">
+                <h2><span class="material-icons">${f.icon}</span> ${f.name}の系統（${n}）</h2>
+                <button class="btn-close" onclick="HarborUI.closeModal('family-modal')"><span class="material-icons">close</span></button>
+            </div>
+            <div class="rg-modal-body">
+                <div class="rg-summary">
+                    <div class="rg-summary-row ${n >= 2 ? 'rg-on' : ''}"><span>2つ装備</span><strong>${f.bonus2.text}</strong></div>
+                    <div class="rg-summary-row ${n >= 4 ? 'rg-on' : ''}"><span>4つ装備</span><strong>${f.bonus4.text}</strong></div>
+                </div>
+                <p class="rg-note">同じ系統のスキルを装備すると数が増えます。${rod ? `${rod}を持っていると1つ分に数えます。` : ''}</p>
+            </div>
+        `);
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) this.closeModal('family-modal');
+        });
+    },
+
+    // スキルのアイコン（系統のアイコンにそろえる。系統がなければ元のアイコン）
+    skillIcon(skill) {
+        const family = GameState.getSkillFamily(skill.id);
+        if (skill.tier === 0) return 'workspace_premium';
+        return family ? family.icon : (skill.icon || 'auto_fix_high');
+    },
+
+    // 報酬・商品のカードに出す系統の印。取ると発動するなら強調する
+    synergyHtml(skillId) {
+        const family = GameState.getSkillFamily(skillId);
+        if (!family) return '';
+        const n = GameState.getFamilyCounts()[family.id];
+        const after = n + 1;
+        if (after === 2 || after === 4) {
+            const text = after === 2 ? family.bonus2.text : family.bonus4.text;
+            return `<span class="rg-synergy rg-fire"><span class="material-icons">${family.icon}</span>${family.name}${after}つ目で発動：${text}</span>`;
+        }
+        return `<span class="rg-synergy"><span class="material-icons">${family.icon}</span>${family.name}${n > 0 ? ` ${n}→${after}` : ''}</span>`;
+    },
+
     // ----------------------------------------
-    // ラウンド結果と報酬3択
+    // ラウンド結果と報酬
     // ----------------------------------------
     summaryHtml(summary) {
         const grade = GAME_DATA.ROGUE_CONFIG.grades.find(g => g.id === summary.grade);
@@ -76,31 +205,40 @@ const HarborUI = {
         const banner = summary.isFinalClear
             ? `<div class="rg-banner"><span class="material-icons">emoji_events</span> 釣り旅達成！ ここから先はエンドレスです</div>`
             : '';
+        const total = summary.clearBonus + summary.leftoverBonus;
 
         return `
             ${banner}
-            <div class="rg-summary">
+            <div class="rg-summary rg-summary-compact">
                 <div class="rg-summary-row"><span>評価</span><strong class="rg-grade rg-grade-${grade.id}">${grade.name}${gradeNote ? `<small>${gradeNote}</small>` : ''}</strong></div>
-                <div class="rg-summary-row"><span>水揚げ</span><strong>${summary.earned.toLocaleString()} / ${summary.target.toLocaleString()} G</strong></div>
-                <div class="rg-summary-row"><span>クリアボーナス</span><strong class="rg-plus">+${summary.clearBonus.toLocaleString()} G</strong></div>
-                <div class="rg-summary-row"><span>余った支給餌 ×${summary.leftover}</span><strong class="rg-plus">+${summary.leftoverBonus.toLocaleString()} G</strong></div>
+                <div class="rg-summary-row"><span>水揚げ ${summary.earned.toLocaleString()} / ${summary.target.toLocaleString()} G</span><strong class="rg-plus">ボーナス +${total.toLocaleString()} G</strong></div>
             </div>
         `;
     },
 
-    rewardHtml(harbor) {
-        const cards = harbor.rewardOptions.map((id, index) => {
-            const skill = GameState.getSkillData(id);
-            return `
-                <button class="rg-reward-card rg-tier-${skill.tier}" onclick="HarborUI.onChooseReward(${index})">
-                    <span class="material-icons rg-reward-icon">${skill.icon || 'auto_fix_high'}</span>
-                    <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span>
-                    <span class="rg-reward-name">${skill.name}</span>
-                    <span class="rg-reward-desc">${skill.description}</span>
-                </button>
-            `;
-        }).join('');
+    nushiRewardHtml(harbor) {
+        const cards = harbor.nushiOptions.map((id, index) => this.rewardCard(id, `HarborUI.onChooseNushiReward(${index})`)).join('');
+        return `
+            <h3 class="rg-section-title rg-nushi-title"><span class="material-icons">emoji_events</span> ヌシの報酬：特別スキルを1つ選ぶ</h3>
+            <div class="rg-reward-list rg-count-${harbor.nushiOptions.length}">${cards}</div>
+        `;
+    },
 
+    rewardCard(id, onclick) {
+        const skill = GameState.getSkillData(id);
+        return `
+            <button class="rg-reward-card rg-tier-${skill.tier}" onclick="${onclick}">
+                <span class="material-icons rg-reward-icon">${this.skillIcon(skill)}</span>
+                <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span>
+                <span class="rg-reward-name">${skill.name}</span>
+                <span class="rg-reward-desc">${skill.description}</span>
+                ${this.synergyHtml(id)}
+            </button>
+        `;
+    },
+
+    rewardHtml(harbor) {
+        const cards = harbor.rewardOptions.map((id, index) => this.rewardCard(id, `HarborUI.onChooseReward(${index})`)).join('');
         return `
             <h3 class="rg-section-title"><span class="material-icons">redeem</span> 報酬スキルを1つ選ぶ</h3>
             <div class="rg-reward-list rg-count-${harbor.rewardOptions.length}">${cards}</div>
@@ -116,18 +254,19 @@ const HarborUI = {
     shopHtml(harbor) {
         const money = GameState.money;
 
-        const skillCards = harbor.shopSkills.map((offer, index) => {
+        // スキルは縦の行（アイコン / 名前と効果 / 価格）
+        const skillRows = harbor.shopSkills.map((offer, index) => {
             const skill = GameState.getSkillData(offer.id);
             const price = RunManager.getSkillPrice(offer.id);
             return `
-                <button class="rg-card rg-skill-card rg-tier-${skill.tier} ${offer.sold ? 'sold' : ''}"
+                <button class="rg-shop-row rg-tier-${skill.tier} ${offer.sold ? 'sold' : ''}" data-shop-skill="${index}"
                     onclick="HarborUI.onBuySkill(${index})" ${offer.sold ? 'disabled' : ''}>
-                    <span class="rg-card-top">
-                        <span class="material-icons rg-skill-icon">${skill.icon || 'auto_fix_high'}</span>
-                        <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span>
+                    <span class="material-icons rg-shop-icon rg-tier-${skill.tier}">${this.skillIcon(skill)}</span>
+                    <span class="rg-shop-text">
+                        <span class="rg-shop-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span></span>
+                        <span class="rg-shop-desc">${skill.description}</span>
+                        ${offer.sold ? '' : this.synergyHtml(offer.id)}
                     </span>
-                    <span class="rg-card-name">${skill.name}</span>
-                    <span class="rg-card-desc">${skill.description}</span>
                     ${offer.sold ? '<span class="rg-price">購入済み</span>' : this.priceHtml(price, money)}
                 </button>
             `;
@@ -138,27 +277,40 @@ const HarborUI = {
 
         const power = GameState.getTotalPower();
         const offers = RunManager.getBaitOffers();
-        const baitTiles = GAME_DATA.ROGUE_CONFIG.baitShop.map(item => {
-            const bait = GAME_DATA.BAITS.find(b => b.id === item.id);
-            const offer = offers.find(o => o.id === item.id);
-            if (!offer) {
-                return `<div class="rg-card rg-bait-tile locked">
-                    <span class="rg-rank-chip rarity-${bait.rank}">${bait.rank}</span>
-                    <span class="rg-card-desc">R${item.fromRound}から</span>
-                </div>`;
-            }
-            const rate = FishingGame.estimateBaitSuccess(item.id, power);
+        const baitTiles = offers.map(offer => {
+            const bait = GAME_DATA.BAITS.find(b => b.id === offer.id);
+            const rate = FishingGame.estimateBaitSuccess(offer.id, power);
             return `
                 <button class="rg-card rg-bait-tile ${offer.stock <= 0 ? 'sold' : ''}"
-                    onclick="HarborUI.onBuyBait('${item.id}')" ${offer.stock <= 0 ? 'disabled' : ''}>
+                    onclick="HarborUI.onBuyBait('${offer.id}')" ${offer.stock <= 0 ? 'disabled' : ''}>
                     <span class="rg-rank-chip rarity-${bait.rank}">${bait.rank}</span>
                     <span class="rg-card-name">×${offer.quantity}</span>
                     <span class="rg-rate ${rate < 0.5 ? 'rg-low' : ''}">成功 ${Math.round(rate * 100)}%</span>
-                    <span class="rg-card-desc">所持${GameState.getBaitCount(item.id)}・在庫${offer.stock}</span>
+                    <span class="rg-card-desc">所持${GameState.getBaitCount(offer.id)}・在庫${offer.stock}</span>
                     ${offer.stock <= 0 ? '<span class="rg-price">売り切れ</span>' : this.priceHtml(offer.price, money)}
                 </button>
             `;
         }).join('');
+
+        // 特殊餌（1種だけ）
+        const special = harbor.specialBait;
+        let specialTile = '';
+        if (special) {
+            const bait = GAME_DATA.BAITS.find(b => b.id === special.id);
+            specialTile = `
+                <button class="rg-card rg-bait-tile rg-special-tile ${special.sold ? 'sold' : ''}"
+                    onclick="HarborUI.onBuySpecialBait()" ${special.sold ? 'disabled' : ''}>
+                    <span class="rg-rank-chip rg-bait-special">${bait.label}</span>
+                    <span class="rg-card-name">${bait.name} ×${special.quantity}</span>
+                    <span class="rg-card-desc">${bait.short || bait.description}</span>
+                    ${special.sold ? '<span class="rg-price">購入済み</span>' : this.priceHtml(RunManager.getSpecialBaitPrice(), money)}
+                </button>`;
+        }
+
+        // まだ並ばない餌は1行にまとめる「AはR4から、SはR6から」
+        const nextRound = GameState.run.round + 1;
+        const locked = GAME_DATA.ROGUE_CONFIG.baitShop.filter(item => item.fromRound > nextRound)
+            .map(item => `${GAME_DATA.BAITS.find(b => b.id === item.id).rank}はR${item.fromRound}から`);
 
         return `
             <div class="rg-section-head">
@@ -167,10 +319,11 @@ const HarborUI = {
                     <span class="material-icons">refresh</span> 入れ替え ${rerollLabel}
                 </button>
             </div>
-            <div class="rg-card-row rg-cols-3">${skillCards}</div>
+            <div class="rg-shop-list">${skillRows}</div>
 
             <h3 class="rg-section-title"><span class="material-icons">set_meal</span> 餌 <small>成功率は今のパワーでの目安。買った餌は持ち越せます</small></h3>
-            <div class="rg-card-row rg-cols-4">${baitTiles}</div>
+            <div class="rg-card-row rg-cols-${Math.min(4, offers.length + (special ? 1 : 0))}">${baitTiles}${specialTile}</div>
+            ${locked.length ? `<p class="rg-locked-line">${locked.join('、')}</p>` : ''}
 
             <h3 class="rg-section-title"><span class="material-icons">phishing</span> 竿 <small>購入・強化のたびにスキルスロット+1</small></h3>
             ${this.rodHtml(money)}
@@ -203,14 +356,18 @@ const HarborUI = {
         } else if (offers.length === 0) {
             shelf = '<div class="rg-empty-slot">この宿の竿は売り切れました</div>';
         } else {
-            shelf = `<div class="rg-card-row rg-cols-2">${offers.map((typeId, index) => `
+            shelf = `<div class="rg-card-row rg-cols-2">${offers.map((typeId, index) => {
+                const family = GAME_DATA.ROGUE_CONFIG.families.find(f => f.rodType === typeId);
+                return `
                 <button class="rg-card rg-rod-card" onclick="HarborUI.onBuyRod(${index})">
                     ${RodAnimator.previewSvg(typeId, nextIndex)}
                     <span class="rg-card-name">${GameState.getRodDisplayName(nextIndex, typeId)}</span>
                     <span class="rg-card-desc">${GameState.getRodType(typeId).description}</span>
+                    ${family ? `<span class="rg-synergy"><span class="material-icons">${family.icon}</span>${family.name}に1つ分</span>` : ''}
                     <span class="rg-card-desc">竿パワー ${power}→${nextRod.basePower}（星は0から）</span>
                     ${this.priceHtml(GameState.getRodPrice(nextIndex, typeId), money)}
-                </button>`).join('')}</div>`;
+                </button>`;
+            }).join('')}</div>`;
         }
         return `<div class="rg-card-row">${upgrade}</div>${shelf}`;
     },
@@ -228,7 +385,10 @@ const HarborUI = {
         const nextRound = run.round + 1;
         const region = RunManager.getRegion(nextRound);
         const supply = GAME_DATA.BAITS.find(b => b.id === RunManager.getSupplyBait(nextRound));
-        const locked = !harbor.rewardTaken;
+        const supplyCount = Math.max(1, RunManager.config.baitPerRound + RunManager.getAscensionRules().supplyDelta);
+        const nushiPending = harbor.nushiOptions && harbor.nushiOptions.length && !harbor.nushiTaken;
+        const locked = !harbor.rewardTaken || nushiPending;
+        const isNushi = RunManager.isNushiRound(nextRound);
 
         const cards = harbor.spotOffers.map((offer, index) => {
             const spot = region.spots.find(s => s.id === offer.spot);
@@ -248,8 +408,9 @@ const HarborUI = {
         }).join('');
 
         return `
-            <div class="rg-next-label">${locked ? '報酬を選ぶと出発できます' : `R${nextRound} ${region.name}：釣り場を選んで出発`}
-                <span class="rg-next-supply">支給: ${supply.name}×${RunManager.config.baitPerRound}</span></div>
+            <div class="rg-next-label">${locked ? '報酬を選ぶと出発できます' : `R${nextRound} ${region.name}へ出発`}
+                ${isNushi ? '<span class="rg-next-nushi">ヌシ戦</span>' : ''}
+                <span class="rg-next-supply">支給: ${supply.name}×${supplyCount}</span></div>
             <div class="rg-area-row rg-cols-${harbor.spotOffers.length}">${cards}</div>
         `;
     },
@@ -265,13 +426,27 @@ const HarborUI = {
     onChooseReward(index) {
         SoundManager.play('select');
         const skillId = GameState.run.harbor.rewardOptions[index];
+        const from = this._rectOf(document.querySelectorAll('.rg-reward-card')[index]);
+        const before = this._snapshot();
         if (RunManager.chooseReward(index)) {
-            const equippedNow = GameState.getEquippedSkillCount(skillId) > 0;
-            UIManager.showNotification('スキル獲得', equippedNow
-                ? `${GameState.getSkillData(skillId).name} を装備しました`
-                : `${GameState.getSkillData(skillId).name} を控えに入れました（スロットが一杯です）`, 'auto_fix_high', 2500);
+            this.render();
+            this.animateGain(skillId, from, before);
+        } else {
+            this.render();
         }
-        this.render();
+    },
+
+    onChooseNushiReward(index) {
+        SoundManager.play('select');
+        const skillId = GameState.run.harbor.nushiOptions[index];
+        const from = this._rectOf(document.querySelectorAll('.rg-reward-card')[index]);
+        const before = this._snapshot();
+        if (RunManager.chooseNushiReward(index)) {
+            this.render();
+            this.animateGain(skillId, from, before);
+        } else {
+            this.render();
+        }
     },
 
     onSkipReward() {
@@ -279,11 +454,91 @@ const HarborUI = {
         this.render();
     },
 
-    onBuySkill(index) { this._after(RunManager.buySkill(index)); },
+    onBuySkill(index) {
+        const skillId = GameState.run.harbor.shopSkills[index].id;
+        const from = this._rectOf(document.querySelector(`[data-shop-skill="${index}"] .rg-shop-icon`));
+        const before = this._snapshot();
+        const ok = RunManager.buySkill(index);
+        this._after(ok);
+        if (ok) this.animateGain(skillId, from, before);
+    },
     onReroll() { this._after(RunManager.rerollSkills()); },
     onBuyBait(baitId) { this._after(RunManager.buyBait(baitId)); },
-    onUpgradeRod() { this._after(RunManager.upgradeRod()); },
-    onBuyRod(index) { this._after(RunManager.buyNextRod(index)); },
+    onBuySpecialBait() { this._after(RunManager.buySpecialBait()); },
+    onUpgradeRod() { this._rodChange(RunManager.upgradeRod()); },
+    onBuyRod(index) { this._rodChange(RunManager.buyNextRod(index)); },
+
+    _rodChange(ok) {
+        const before = this._snapshot();
+        this._after(ok);
+        if (ok) this.animateGain(null, null, before);
+    },
+
+    // ----------------------------------------
+    // 購入の演出: アイコンがビルド帯へ飛び、パワーの数字が回り、新しいスロットが光る
+    // ----------------------------------------
+    _rectOf(el) {
+        return el ? el.getBoundingClientRect() : null;
+    },
+
+    _snapshot() {
+        return {
+            power: GameState.getTotalPower(),
+            chips: document.querySelectorAll('.rg-build .rg-skill-chip').length
+        };
+    },
+
+    animateGain(skillId, fromRect, before) {
+        const chips = [...document.querySelectorAll('.rg-build .rg-skill-chip')];
+
+        // 新しく埋まった（または増えた）スロットを光らせる
+        let target = null;
+        if (skillId) {
+            const matches = chips.filter(c => c.dataset.skill === skillId);
+            target = matches[matches.length - 1] || null;
+        } else if (chips.length > before.chips) {
+            target = chips[chips.length - 1];
+        }
+
+        const glow = () => {
+            if (!target) return;
+            target.classList.add('rg-new-slot');
+            setTimeout(() => target.classList.remove('rg-new-slot'), 900);
+        };
+
+        if (skillId && fromRect && target) {
+            const to = target.getBoundingClientRect();
+            const skill = GameState.getSkillData(skillId);
+            const fly = document.createElement('span');
+            fly.className = `material-icons rg-fly-icon rg-tier-${skill.tier}`;
+            fly.textContent = this.skillIcon(skill);
+            fly.style.left = `${fromRect.left + fromRect.width / 2 - 16}px`;
+            fly.style.top = `${fromRect.top + fromRect.height / 2 - 16}px`;
+            document.body.appendChild(fly);
+            requestAnimationFrame(() => {
+                fly.style.transform = `translate(${to.left + to.width / 2 - fromRect.left - fromRect.width / 2}px, ${to.top + to.height / 2 - fromRect.top - fromRect.height / 2}px) scale(0.8)`;
+                fly.style.opacity = '0.4';
+            });
+            setTimeout(() => { fly.remove(); glow(); }, 520);
+        } else {
+            glow();
+        }
+
+        // パワーの数字を回す
+        const powerEl = document.getElementById('harbor-power');
+        const after = GameState.getTotalPower();
+        if (powerEl && after !== before.power) {
+            const start = performance.now();
+            powerEl.classList.add('rg-rolling');
+            const step = now => {
+                const t = Math.min(1, (now - start) / 600);
+                powerEl.textContent = Math.round(before.power + (after - before.power) * t);
+                if (t < 1) requestAnimationFrame(step);
+                else powerEl.classList.remove('rg-rolling');
+            };
+            requestAnimationFrame(step);
+        }
+    },
 
     onDepart(index) {
         if (!RunManager.depart(index)) {
@@ -296,6 +551,7 @@ const HarborUI = {
     // ========================================
     showSkill(skillId, isEquipped) {
         const skill = GameState.getSkillData(skillId);
+        const family = GameState.getSkillFamily(skillId);
         const inHarbor = GameState.run && GameState.run.phase === 'harbor';
 
         let actions = '';
@@ -308,10 +564,10 @@ const HarborUI = {
 
         const overlay = this.openModal('skill-modal', `
             <div class="modal-header">
-                <h2><span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${skill.icon || 'auto_fix_high'}</span> ${skill.name}</h2>
+                <h2><span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${this.skillIcon(skill)}</span> ${skill.name}</h2>
                 <button class="btn-close" onclick="HarborUI.closeModal('skill-modal')"><span class="material-icons">close</span></button>
             </div>
-            <p class="rg-skill-detail"><span class="rg-tier-badge rg-tier-${skill.tier}">Tier ${this.TIER_LABELS[skill.tier]}</span> ${isEquipped ? '装備中' : '控え'}</p>
+            <p class="rg-skill-detail"><span class="rg-tier-badge rg-tier-${skill.tier}">Tier ${this.TIER_LABELS[skill.tier]}</span> ${family ? `系統：${family.name}` : ''} ・ ${isEquipped ? '装備中' : '控え'}</p>
             <p class="rg-skill-detail">${skill.description}</p>
             ${actions ? `<div class="rg-modal-actions">${actions}</div>` : ''}
         `);
@@ -379,6 +635,8 @@ const HarborUI = {
                     <div class="rg-summary-row"><span>天候：${weather.name}</span><span class="rg-area-desc">${weather.description}</span></div>` : ''}
                     ${highValue ? `<div class="rg-summary-row"><span>本日の高値</span><strong>${highValue.name}（売値${RunManager.config.highValueMult}倍）</strong></div>` : ''}
                 </div>
+                ${run.nushi ? `<div class="rg-summary"><div class="rg-summary-row"><span>ヌシ</span><strong>${run.nushi.name} ${run.nushi.caught ? '（釣った）' : `（${RunManager.config.nushi.fromCast}投目から）`}</strong></div></div>` : ''}
+                ${this.familyHtml()}
                 <div class="shop-items">${skills}</div>
                 <p class="rg-note">装備の変更と買い物は、ラウンドをクリアした後の釣り宿で行えます。</p>
                 <button class="rg-sound-btn" onclick="UIManager.toggleSound()"></button>
@@ -398,6 +656,7 @@ const HarborUI = {
         const run = GameState.run;
         if (!run || run.phase !== 'setup') return;
         const rod = GAME_DATA.RODS[0];
+        this.chosenAscension = this.chosenAscension || 0;
 
         const cards = run.startRods.map(typeId => `
             <button class="rg-card rg-rod-card rg-start-rod" onclick="HarborUI.onChooseStartRod('${typeId}')">
@@ -407,25 +666,52 @@ const HarborUI = {
             </button>
         `).join('');
 
+        // まだ解禁していない竿のタイプ
+        const unlocked = RunManager.getUnlocked();
+        const lockedRods = RunManager.config.unlocks.filter(u => u.kind === 'rod' && !unlocked.rods.includes(u.id))
+            .map(u => `${u.label}（${RunManager.unlockNeedText(u)}）`);
+
+        // 荒波レベル（釣り旅を達成すると選べる）
+        let ascension = '';
+        if (run.maxAscension > 0) {
+            this.chosenAscension = Math.min(this.chosenAscension, run.maxAscension);
+            const buttons = Array.from({ length: run.maxAscension + 1 }, (_, lv) =>
+                `<button class="rg-asc-btn ${lv === this.chosenAscension ? 'selected' : ''}" onclick="HarborUI.onChooseAscension(${lv})">${lv === 0 ? '通常' : `荒波${lv}`}</button>`).join('');
+            const rules = RunManager.config.ascension.filter(a => a.level <= this.chosenAscension).map(a => a.text);
+            ascension = `
+                <div class="rg-asc">
+                    <div class="rg-asc-row">${buttons}</div>
+                    <p class="rg-note">${rules.length ? rules.join('・') : '荒波レベルを上げると条件が厳しくなります'}</p>
+                </div>`;
+        }
+
         this.openModal('rod-choice-modal', `
             <div class="modal-header">
                 <h2><span class="material-icons">phishing</span> 最初の竿を選ぶ</h2>
             </div>
+            ${ascension}
             <p class="rg-note">竿パワー ${rod.basePower} の木の竿です。タイプで得意なことが変わります。</p>
             <div class="rg-start-rod-list">${cards}</div>
+            ${lockedRods.length ? `<p class="rg-locked-line">未解禁: ${lockedRods.join('、')}</p>` : ''}
         `);
+    },
+
+    onChooseAscension(level) {
+        SoundManager.play('select');
+        this.chosenAscension = level;
+        this.showRodChoice();
     },
 
     onChooseStartRod(typeId) {
         SoundManager.play('select');
-        if (RunManager.chooseStartRod(typeId)) this.closeModal('rod-choice-modal');
+        if (RunManager.chooseStartRod(typeId, this.chosenAscension || 0)) this.closeModal('rod-choice-modal');
     },
 
     skillRow(skillId) {
         const skill = GameState.getSkillData(skillId);
         return `
             <div class="shop-item">
-                <span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${skill.icon || 'auto_fix_high'}</span>
+                <span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${this.skillIcon(skill)}</span>
                 <div class="item-info">
                     <div class="item-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span></div>
                     <div class="item-desc">${skill.description}</div>
@@ -443,7 +729,7 @@ const HarborUI = {
     // ========================================
     // ゲームオーバー
     // ========================================
-    showGameOver(isBest) {
+    showGameOver(isBest, newUnlocks = []) {
         const run = GameState.run;
         const cleared = run.round - 1;
         const biggest = GameState.biggestFish ? GameState.biggestFish.name : '―';
@@ -454,9 +740,10 @@ const HarborUI = {
         this.openModal('gameover-modal', `
             <div class="rg-gameover">
                 <div class="rg-gameover-title">GAME OVER</div>
-                <p class="rg-gameover-lead">ラウンド${run.round}で餌が尽きた…<br>
+                <p class="rg-gameover-lead">ラウンド${run.round}で${run.retired ? '釣り旅を終えた' : '餌が尽きた…'}<br>
                     水揚げ ${run.earned.toLocaleString()} / ${run.target.toLocaleString()} G</p>
                 ${isBest ? '<div class="rg-banner"><span class="material-icons">military_tech</span> 最高記録を更新！</div>' : ''}
+                ${newUnlocks.length ? `<div class="rg-banner rg-unlock-banner"><span class="material-icons">lock_open</span> 新しく解禁：${newUnlocks.join('、')}</div>` : ''}
                 <div class="rg-summary">
                     <div class="rg-summary-row"><span>クリアしたラウンド</span><strong>${cleared}</strong></div>
                     <div class="rg-summary-row"><span>釣り上げ成功率</span><strong>${pct(st.catches, st.casts)}（${st.catches}/${st.casts}投）</strong></div>

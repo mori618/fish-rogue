@@ -853,7 +853,7 @@ body[data-screen="harbor"] .notification-banner {
 }
 
 .rg-reward-desc {
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1.4;
     color: var(--text-secondary);
 }
@@ -1449,4 +1449,383 @@ body[data-screen="harbor"] .notification-banner {
     color: #3e2723;
     background: var(--accent-yellow);
     border-radius: 8px;
+}
+
+
+/* ========================================
+   釣り宿の仕上げ（設計書11.2）と系統・ヌシ・特殊餌
+   ======================================== */
+
+/* 系統（シナジー） */
+.rg-family-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.rg-family-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    cursor: pointer;
+}
+
+.rg-family-chip strong {
+    color: var(--text-primary);
+}
+
+.rg-family-chip small {
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+.rg-family-chip .material-icons {
+    font-size: 16px;
+}
+
+.rg-family-chip.rg-on {
+    color: #fde68a;
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+}
+
+.rg-family-chip.rg-max {
+    color: #1c1410;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-color: #fde68a;
+}
+
+.rg-family-chip.rg-max strong {
+    color: #1c1410;
+}
+
+.rg-summary-row.rg-on strong {
+    color: #fde68a;
+}
+
+.rg-synergy {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 2px;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+.rg-synergy .material-icons {
+    font-size: 14px;
+}
+
+.rg-synergy.rg-fire {
+    color: #1c1410;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fde68a, #f59e0b);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+/* ショップのスキル: 縦の行 */
+.rg-shop-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.rg-shop-row {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 64px;
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-family: inherit;
+    text-align: left;
+    background: var(--bg-card);
+    border: 2px solid var(--rg-tier-color, var(--border-color));
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.rg-shop-row:not(:disabled):active {
+    transform: scale(0.98);
+}
+
+.rg-shop-row.sold {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.rg-shop-icon {
+    font-size: 32px;
+    color: var(--rg-tier-color);
+    justify-self: center;
+}
+
+.rg-shop-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 0;
+}
+
+.rg-shop-name {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.rg-shop-desc {
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.rg-shop-row .rg-price {
+    margin-top: 0;
+}
+
+.rg-locked-line {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* 特殊餌 */
+.rg-bait-special {
+    color: #fde68a !important;
+    border-color: #f59e0b !important;
+    background: rgba(245, 158, 11, 0.15);
+}
+
+.rg-special-tile {
+    border: 2px solid #f59e0b;
+}
+
+.rg-special-tile .rg-card-desc {
+    font-size: 12px;
+}
+
+/* 購入の演出 */
+.rg-fly-icon {
+    position: fixed;
+    z-index: 3000;
+    width: 32px;
+    height: 32px;
+    font-size: 32px;
+    color: var(--rg-tier-color, #fff);
+    pointer-events: none;
+    transition: transform 0.5s cubic-bezier(0.5, 0, 0.3, 1), opacity 0.5s ease;
+    filter: drop-shadow(0 0 6px var(--rg-tier-color, #fff));
+}
+
+.rg-skill-chip.rg-new-slot {
+    animation: rg-slot-glow 0.9s ease-out;
+}
+
+@keyframes rg-slot-glow {
+    0% { box-shadow: 0 0 0 0 rgba(253, 230, 138, 0.9); background: rgba(253, 230, 138, 0.5); }
+    100% { box-shadow: 0 0 0 12px rgba(253, 230, 138, 0); background: rgba(0, 0, 0, 0.25); }
+}
+
+#harbor-power.rg-rolling {
+    color: #fde68a;
+}
+
+/* 到着演出（評価メダルと数え上げ） */
+.rg-arrival {
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: rgba(20, 14, 10, 0.82);
+    animation: rg-fade-in 0.2s ease-out;
+    cursor: pointer;
+}
+
+.rg-arrival.rg-hide {
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.rg-arrival-medal {
+    width: 128px;
+    height: 128px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 56px;
+    font-weight: 900;
+    color: #1c1410;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff8 0, transparent 40%), var(--rg-medal, #c08457);
+    border: 6px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 40px var(--rg-medal, #c08457);
+    animation: rg-medal-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.rg-arrival.rg-grade-gold { --rg-medal: #fbbf24; }
+.rg-arrival.rg-grade-silver { --rg-medal: #cbd5e1; }
+.rg-arrival.rg-grade-bronze { --rg-medal: #c08457; }
+
+@keyframes rg-medal-pop {
+    0% { transform: scale(0.2) rotate(-30deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+@keyframes rg-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.rg-arrival-rows {
+    width: min(84vw, 320px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+.rg-arrival-rows > div {
+    display: flex;
+    justify-content: space-between;
+}
+
+.rg-arrival-rows strong {
+    font-family: 'Roboto Mono', monospace;
+    color: var(--text-primary);
+}
+
+.rg-arrival-total {
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 20px;
+}
+
+.rg-arrival-total strong {
+    color: #fde68a;
+}
+
+.rg-arrival-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0;
+}
+
+.rg-arrival.rg-done .rg-arrival-hint {
+    opacity: 1;
+    transition: opacity 0.3s;
+}
+
+.rg-summary-compact .rg-summary-row span {
+    font-size: 13px;
+}
+
+/* ヌシ */
+.rg-nushi-title {
+    color: #fde68a;
+}
+
+.rg-next-nushi,
+.rg-chip-nushi {
+    color: #1c1410;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fde68a, #f59e0b);
+}
+
+.rg-next-nushi {
+    margin-left: 6px;
+    padding: 1px 8px;
+    font-size: 12px;
+    border-radius: 10px;
+}
+
+.rg-chip-nushi.rg-done {
+    color: #dcfce7;
+    background: rgba(34, 197, 94, 0.35);
+}
+
+.rg-chip-chum {
+    color: #bae6fd;
+}
+
+.rg-intro-nushi {
+    margin-top: 6px;
+    padding: 4px 14px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1c1410;
+    background: linear-gradient(135deg, #fde68a, #f59e0b);
+    border-radius: 14px;
+}
+
+/* 荒波レベル */
+.rg-asc {
+    margin-bottom: 8px;
+}
+
+.rg-asc-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.rg-asc-btn {
+    min-height: 36px;
+    padding: 4px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    cursor: pointer;
+}
+
+.rg-asc-btn.selected {
+    color: #1c1410;
+    background: #fbbf24;
+    border-color: #fde68a;
+}
+
+.rg-unlock-banner {
+    background: rgba(34, 197, 94, 0.2);
+}
+
+.rg-nushi-tag {
+    display: inline-block;
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #1c1410;
+    background: linear-gradient(135deg, #fde68a, #f59e0b);
+    border-radius: 8px;
+}
+
+/* 狭い画面ではチップの余白を詰め、エリア名を先に縮める（ヘルプが押し出されないように） */
+@media (max-width: 480px) {
+    .rg-chips { gap: 4px; }
+    .rg-chip { padding: 2px 8px; }
+    .rg-chip-btn { min-width: 40px; }
+    #area-chip.rg-chip { flex: 0 1 auto; min-width: 34px; }
+}
+
+.rg-chip-nushi {
+    padding: 2px 8px;
 }

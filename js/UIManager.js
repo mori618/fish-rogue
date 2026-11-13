@@ -144,7 +144,11 @@ const UIManager = {
 
         // 達成前は「あと○G」。達成後は次の評価までの残り
         if (text) {
-            if (!run.reached) {
+            if (!run.reached && run.earned >= run.target && (!run.nushi || run.nushi.caught)) {
+                text.textContent = '目標達成！';
+            } else if (!run.reached && run.earned >= run.target && run.nushi && !run.nushi.caught) {
+                text.textContent = 'ヌシを釣れ！';
+            } else if (!run.reached) {
                 text.textContent = `あと ${Math.max(0, run.target - run.earned).toLocaleString()} G`;
             } else {
                 const next = [...GAME_DATA.ROGUE_CONFIG.grades].reverse().find(g => run.earned < run.target * g.rate);
@@ -185,7 +189,9 @@ const UIManager = {
         warning.classList.toggle('hidden', !danger);
         screen.classList.toggle('rg-danger', danger);
         if (danger) {
-            warning.textContent = `残り${casts}投・あと${need.toLocaleString()}G（1投あたり${Math.ceil(need / casts).toLocaleString()}G）`;
+            warning.textContent = need <= 0
+                ? `残り${casts}投・ヌシがまだ（${run.nushi.name}）`
+                : `残り${casts}投・あと${need.toLocaleString()}G（1投あたり${Math.ceil(need / casts).toLocaleString()}G）`;
         }
     },
 
@@ -272,6 +278,25 @@ const UIManager = {
             combo.textContent = `×${run.combo} +${Math.round(bonus * 100)}%`;
         }
 
+        // ヌシ: まだなら「ヌシ」、釣ったら「ヌシ済」
+        const nushiChip = document.getElementById('nushi-chip');
+        if (nushiChip) {
+            nushiChip.classList.toggle('hidden', !run.nushi);
+            if (run.nushi) {
+                nushiChip.classList.toggle('rg-done', run.nushi.caught);
+                nushiChip.innerHTML = `<span class="material-icons">${run.nushi.caught ? 'check_circle' : 'emoji_events'}</span>`;
+                nushiChip.title = `ヌシ：${run.nushi.name}${run.nushi.caught ? '（釣った）' : ''}`;
+                nushiChip.setAttribute('aria-label', nushiChip.title);
+            }
+        }
+
+        // まき餌の残り投数
+        const chumChip = document.getElementById('chum-chip');
+        if (chumChip) {
+            chumChip.classList.toggle('hidden', !(run.chum > 0));
+            chumChip.textContent = `撒×${run.chum || 0}`;
+        }
+
         const areaChip = document.getElementById('area-chip');
         const weather = GameState.getCurrentWeather();
         if (areaChip && weather) {
@@ -298,6 +323,7 @@ const UIManager = {
             <div class="rg-intro-spot">${GameState.getSpotDisplayName()}</div>
             <div class="rg-intro-detail">目標 ${run.target.toLocaleString()} G ／ ${supply.name}×${run.supply.count}</div>
             ${highValue ? `<div class="rg-intro-detail">本日の高値: ${highValue.name}</div>` : ''}
+            ${run.nushi ? `<div class="rg-intro-nushi">ヌシ戦：${run.nushi.name}を釣り上げろ</div>` : ''}
             ${weather && weather.tags.length ? `<div class="rg-intro-tags">${weather.tags.map(t => `<span class="rg-tag ${t.good ? 'good' : 'bad'}">${t.text}</span>`).join('')}</div>` : ''}
         `;
         intro.addEventListener('pointerdown', e => {
@@ -320,7 +346,7 @@ const UIManager = {
             const selected = bait.id === GameState.baitType;
             return `
                 <button class="rg-bait-slot ${selected ? 'selected' : ''}" onclick="UIManager.selectBait('${bait.id}')" aria-label="${bait.name} ${count}個">
-                    <span class="rg-bait-rank rarity-${bait.rank}">${bait.rank}</span>
+                    <span class="rg-bait-rank ${bait.special ? 'rg-bait-special' : `rarity-${bait.rank}`}">${bait.label || bait.rank}</span>
                     <span class="rg-bait-count ${count <= 1 ? 'rg-low' : ''}">×${count}</span>
                 </button>
             `;
@@ -458,7 +484,7 @@ const UIManager = {
             : '';
         const header = info ? `
                 <div class="rg-battle-info">
-                    <div class="rg-battle-rank"><span class="rarity-${fish.rarity}">${fish.rarity}ランク</span>の魚</div>
+                    <div class="rg-battle-rank">${fish.isNushi ? `<span class="rg-nushi-tag">ヌシ</span> ${fish.name}` : `<span class="rarity-${fish.rarity}">${fish.rarity}ランク</span>の魚`}</div>
                     <div class="rg-matchup rg-matchup-${info.matchup.id}">${info.matchup.label}</div>
                     <div class="rg-battle-power">自分 ${info.power} ／ 魚 ${fish.power}</div>
                     ${phaseDots}
@@ -554,6 +580,7 @@ const UIManager = {
                 if (reward.type === 'money') icon = 'paid';
                 else if (reward.type === 'skill') icon = 'auto_fix_high';
                 else if (reward.type === 'bait') icon = 'set_meal';
+                else if (reward.type === 'nushi') icon = 'emoji_events';
                 
                 return `
                     <div class="extra-reward-pill">

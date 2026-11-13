@@ -184,7 +184,9 @@ const GameState = {
 
     // コンボの上限（早竿で増える）
     getComboMaxStacks() {
-        return GAME_DATA.ROGUE_CONFIG.combo.maxStacks + (this.getRodType().comboStacks || 0);
+        let stacks = GAME_DATA.ROGUE_CONFIG.combo.maxStacks + (this.getRodType().comboStacks || 0);
+        this.getEffectsByType('family_combo_stacks').forEach(e => { stacks += e.value; });
+        return stacks;
     },
 
     // ========================================
@@ -260,8 +262,17 @@ const GameState = {
     },
 
     // 餌を1つ消費する。成功時のみ「餌の達人」で消費を免れることがある
-    useBait(isSuccess = true) {
+    //   opts.redStop: ゲージの赤ゾーンで止めた一投か（技巧4つの効果）
+    useBait(isSuccess = true, opts = {}) {
         if (this.getBaitCount(this.baitType) <= 0) return false;
+
+        // 練り餌: 逃げられても減らない
+        const bait = this.getBaitData();
+        if (!isSuccess && bait && bait.special === 'neri') return true;
+
+        // 天体4つ: フィーバー中は減らない / 技巧4つ: 赤で止めたら減らない
+        if (this.fever.isActive && this.getEffectsByType('family_fever_bait_save').length > 0) return true;
+        if (opts.redStop && this.getEffectsByType('family_red_bait_save').length > 0) return true;
 
         if (isSuccess && Math.random() < this.getBaitSaveChance()) {
             console.log('✨ 餌の達人発動！');
@@ -270,6 +281,53 @@ const GameState = {
 
         this.baitInventory[this.baitType]--;
         return true;
+    },
+
+    // 今選んでいる餌のデータ
+    getBaitData(baitId = this.baitType) {
+        return GAME_DATA.BAITS.find(b => b.id === baitId) || null;
+    },
+
+    // 魚の抽選に使う餌のランク（光る餌はそのラウンドの支給餌と同じ）
+    getBaitRank(bait) {
+        if (!bait) return 'D';
+        if (bait.rankFromSupply && this.run && this.run.supply) {
+            const supply = GAME_DATA.BAITS.find(b => b.id === this.run.supply.id);
+            if (supply) return supply.rank;
+        }
+        return bait.rank;
+    },
+
+    // ========================================
+    // スキルの系統（設計書5.5）
+    // ========================================
+    getSkillFamily(skillId) {
+        const skill = this.getSkillData(skillId);
+        if (!skill || !skill.effect) return null;
+        const effect = skill.effect.type === 'hybrid' && skill.effect.effects ? skill.effect.effects[0] : skill.effect;
+        return GAME_DATA.ROGUE_CONFIG.families.find(f => f.types.includes(effect.type)) || null;
+    },
+
+    // 系統ごとの装備数。竿のタイプも1つ分に数える
+    getFamilyCounts(equipped = this.equippedSkills, rodType = this.rodType) {
+        const counts = {};
+        GAME_DATA.ROGUE_CONFIG.families.forEach(f => { counts[f.id] = f.rodType === rodType ? 1 : 0; });
+        equipped.forEach(id => {
+            const family = this.getSkillFamily(id);
+            if (family) counts[family.id]++;
+        });
+        return counts;
+    },
+
+    // 発動している系統ボーナスの効果
+    getFamilyBonusEffects() {
+        const counts = this.getFamilyCounts();
+        const effects = [];
+        GAME_DATA.ROGUE_CONFIG.families.forEach(f => {
+            if (counts[f.id] >= 2) effects.push(...f.bonus2.effects);
+            if (counts[f.id] >= 4) effects.push(...f.bonus4.effects);
+        });
+        return effects;
     },
 
     // ========================================
@@ -1057,6 +1115,19 @@ const GameState = {
         const weather = this.getCurrentWeather();
         if (weather) {
             weather.effects.forEach(effect => this._collectEffects(effect, type, effects));
+        }
+
+        // 系統ボーナス
+        this.getFamilyBonusEffects().forEach(effect => this._collectEffects(effect, type, effects));
+
+        // 今の餌の効果（光る餌）と、まき餌の残り効果（釣り中のみ）
+        if (this.run && this.run.phase === 'fishing') {
+            const bait = this.getBaitData();
+            if (bait && bait.effects) bait.effects.forEach(effect => this._collectEffects(effect, type, effects));
+            if (this.run.chum > 0) {
+                const maki = GAME_DATA.BAITS.find(b => b.special === 'maki');
+                maki.chum.effects.forEach(effect => this._collectEffects(effect, type, effects));
+            }
         }
         return effects;
     },

@@ -589,6 +589,43 @@ const BAITS = [
         description: 'Sランクが釣れやすい。',
         price: 3000,
         quantity: 5
+    },
+    // --- 特殊餌（釣り宿に1種だけ並ぶ。ランク違いではなく使いどころが違う） ---
+    {
+        id: 'bait_neri',
+        short: '逃げられても減らない',
+        name: '練り餌',
+        label: '練',
+        special: 'neri',
+        rank: 'C',
+        description: '逃げられても減らない（釣れたときだけ1つ使う）。Cランク中心',
+        price: 0,
+        quantity: 1
+    },
+    {
+        id: 'bait_maki',
+        short: '次の3投 待ち半分・2匹+30%',
+        name: 'まき餌',
+        label: '撒',
+        special: 'maki',
+        rank: 'D',
+        description: '投げると次の3投の待ち時間が半分、2匹釣り+30%。この餌では釣れない',
+        price: 0,
+        quantity: 1,
+        chum: { casts: 3, effects: [{ type: 'wait_time_reduction', value: 0.5 }, { type: 'multi_catch_2', value: 0.3 }] }
+    },
+    {
+        id: 'bait_glow',
+        short: '称号10倍・宝箱+10%',
+        name: '光る餌',
+        label: '光',
+        special: 'glow',
+        rank: 'D',                 // 実際のランクはそのラウンドの支給餌と同じ（rankFromSupply）
+        rankFromSupply: true,
+        description: '称号付きが10倍出やすく、宝箱+10%。ランクは支給餌と同じ',
+        price: 0,
+        quantity: 1,
+        effects: [{ type: 'title_boost', value: 10 }, { type: 'treasure_boost', value: 0.1 }]
     }
 ];
 
@@ -1134,6 +1171,85 @@ const ROGUE_CONFIG = {
     //   fish: その釣り場でよく釣れる魚（同じランクの中で出やすさが favoredWeight 倍）
     //   rankBoost: ランクの出やすさの上乗せ（海溝の深海魚など）
     //   water: 釣り画面の水の色（水面, 水底）
+    // --- スキルの系統（設計書5.5）。同じ系統を2つ・4つ装備するとボーナス ---
+    // types: その系統に入る効果の種類。rodType: その竿を持っていると1つ分に数える
+    // bonus2 / bonus4 の effects は「見えないスキル」として混ぜる
+    families: [
+        {
+            id: 'might', name: '剛腕', icon: 'fitness_center', rodType: 'strong',
+            types: ['power_boost', 'overdrive', 'big_game_boost', 'count_skill_power'],
+            bonus2: { text: 'パワー+15%', effects: [{ type: 'overdrive', power: 0.15, speed: 0 }] },
+            bonus4: { text: 'パワーが魚の1.5倍以上なら必ず2匹', effects: [{ type: 'family_overpower_double', ratio: 1.5 }] }
+        },
+        {
+            id: 'skill', name: '技巧', icon: 'my_location', rodType: 'soft',
+            types: ['gauge_slow', 'red_zone_boost', 'second_chance', 'perfect_catch', 'master_needle', 'hit_window_mult', 'nibble_fix', 'auto_hit'],
+            bonus2: { text: '赤ゾーンの幅+20%', effects: [{ type: 'red_zone_boost', value: 0.2 }] },
+            bonus4: { text: '赤ゾーンで止めると餌が減らない', effects: [{ type: 'family_red_bait_save' }] }
+        },
+        {
+            id: 'trade', name: '商売', icon: 'payments', rodType: null,
+            types: ['price_boost', 'high_risk_sell', 'shop_discount', 'upgrade_discount'],
+            bonus2: { text: '売値+15%', effects: [{ type: 'price_boost', value: 0.15 }] },
+            bonus4: { text: '釣り宿の入れ替えが毎回1回無料', effects: [{ type: 'family_free_reroll', value: 1 }] }
+        },
+        {
+            id: 'treasure', name: '宝探し', icon: 'card_giftcard', rodType: 'probe',
+            types: ['treasure_boost', 'treasure_quantity', 'treasure_quality', 'magnet', 'title_boost', 'boat_event_boost', 'bird_event_boost'],
+            bonus2: { text: '宝箱の出現率+5%', effects: [{ type: 'treasure_boost', value: 0.05 }] },
+            bonus4: { text: '宝箱のお金が2倍', effects: [{ type: 'family_treasure_money', value: 2 }] }
+        },
+        {
+            id: 'sky', name: '天体', icon: 'auto_awesome', rodType: null,
+            types: ['fever_charge', 'fever_long', 'fever_bias_sun', 'fever_bias_moon', 'moon_rare_up', 'sun_chest_up', 'fever_treasure_boost', 'eternal_mania', 'cosmic_blessing'],
+            bonus2: { text: 'ラウンド開始時にフィーバーゲージ+2', effects: [{ type: 'family_fever_start', value: 2 }] },
+            bonus4: { text: 'フィーバー中は餌が減らない', effects: [{ type: 'family_fever_bait_save' }] }
+        },
+        {
+            id: 'school', name: '群れ', icon: 'waves', rodType: 'quick',
+            types: ['multi_catch_2', 'multi_catch_3', 'bait_save', 'rare_boost', 'rank_collector', 'wait_time_reduction', 'quick_hit_penalty', 'catch_boost'],
+            bonus2: { text: '2匹釣りの確率+10%', effects: [{ type: 'multi_catch_2', value: 0.1 }] },
+            bonus4: { text: 'コンボの上限+5（最大+100%）', effects: [{ type: 'family_combo_stacks', value: 5 }] }
+        }
+    ],
+
+    // --- ヌシ戦（設計書5.6） ---
+    // このラウンドは目標額に加えて「ヌシを1匹釣り上げる」がクリア条件
+    nushi: {
+        rounds: [3, 6, 9, 10],      // ヌシが出るラウンド
+        fromCast: 6,               // 何投目からかかり始めるか（逃げられても次の一投でまたかかる）
+        phases: 3,                 // ゲージバトルの連戦数
+        speedStep: 0.15,           // 連戦ごとのゲージ速度の上昇
+        powerMult: 1.5,            // ヌシは元の魚よりパワーが高い
+        rewardChoices: 3           // 釣ると特別スキルを3択から1つ
+    },
+
+    // --- 特殊餌（設計書5.7）。釣り宿に1種だけ並ぶ ---
+    // price はそのラウンドの目標額に対する割合（序盤も終盤も同じ重さにする）
+    specialBaits: [
+        { id: 'bait_neri', quantity: 3, priceRate: 0.12 },
+        { id: 'bait_maki', quantity: 2, priceRate: 0.10 },
+        { id: 'bait_glow', quantity: 2, priceRate: 0.15 }
+    ],
+
+    // --- 釣り旅をまたぐ解禁（設計書5.8）。図鑑の登録数か到達ラウンドで解禁 ---
+    unlocks: [
+        { kind: 'rod', id: 'soft', label: '軟竿', need: { fish: 5 } },
+        { kind: 'rod', id: 'quick', label: '早竿', need: { round: 3 } },
+        { kind: 'rod', id: 'probe', label: '探り竿', need: { fish: 12 } },
+        { kind: 'bait', id: 'bait_maki', label: 'まき餌', need: { fish: 8 } },
+        { kind: 'bait', id: 'bait_glow', label: '光る餌', need: { round: 5 } }
+    ],
+
+    // --- 荒波レベル（釣り旅達成後に選べる高難度）。レベルごとに条件が1つ増える ---
+    ascension: [
+        { level: 1, text: '目標額+15%', targetMult: 0.15 },
+        { level: 2, text: '支給される餌-1', supplyDelta: -1 },
+        { level: 3, text: '釣り宿の餌の在庫-1', stockDelta: -1 },
+        { level: 4, text: '目標額さらに+15%', targetMult: 0.15 },
+        { level: 5, text: '報酬スキルの選択肢-1', rewardDelta: -1 }
+    ],
+
     favoredWeight: 3,
     highValueMult: 2,               // 「本日の高値」の魚の売値倍率
     regions: [

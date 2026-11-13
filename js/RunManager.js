@@ -14,15 +14,20 @@ const RunManager = {
     // ========================================
     // 釣り旅の開始・再開
     // ========================================
-    startNewRun() {
+    startNewRun(ascension = 0) {
         GameState.init(null);
+        const meta = SaveManager.loadMeta();
         GameState.run = {
             round: 0,
             target: 0,
             earned: 0,
             phase: 'setup',    // 'setup'（最初の竿選び） | 'fishing' | 'harbor' | 'over'
             harbor: null,      // 釣り宿にいる間だけ持つ状態（報酬候補・品揃えなど）
+            ascension: 0,      // 荒波レベル（竿選びのときに決める）
+            maxAscension: Math.min(this.config.ascension.length, meta.clears || 0),
             startRods: this.pickRodTypes(this.config.startRodChoices, ['all']), // 最初に選べる竿のタイプ
+            nushi: null,       // このラウンドのヌシ { fishId, name, caught }
+            chum: 0,           // まき餌の残り投数
             region: null,      // 今いる水域
             spot: null,        // 今いる釣り場
             weather: 'clear',  // 今の天候
@@ -31,7 +36,8 @@ const RunManager = {
             combo: 0,          // 連続成功数
             supply: null,      // このラウンドに支給された餌 { id, count }
             stats: { casts: 0, catches: 0, escapes: 0, escapedPower: 0, zones: { red: 0, green: 0, white: 0 } },
-            previousBest: SaveManager.loadMeta().bestRound // 釣り旅開始時点の最高記録
+            previousBest: meta.bestRound, // 釣り旅開始時点の最高記録
+            unlockedAtStart: this.unlockLabels(meta) // 終了時に「新しく解禁」を出すため
         };
         SaveManager.recordRun(0, true);
         SaveManager.save();
@@ -39,10 +45,11 @@ const RunManager = {
     },
 
     // 最初の竿を選んで出発する
-    chooseStartRod(typeId) {
+    chooseStartRod(typeId, ascension = 0) {
         const run = this.run;
         if (!run || run.phase !== 'setup' || !run.startRods.includes(typeId)) return false;
         GameState.rodType = typeId;
+        run.ascension = Math.max(0, Math.min(ascension, run.maxAscension || 0));
         // 最初の釣り場は里の水辺からランダム（天候は晴れ）
         const offers = this.createSpotOffers(1);
         this.startNextRound({ ...offers[Math.floor(Math.random() * offers.length)], weather: 'clear' });
@@ -51,7 +58,9 @@ const RunManager = {
 
     // 竿のタイプを重複なしで count 個選ぶ（include は必ず含める）
     pickRodTypes(count, include = []) {
-        const pool = this.config.rodTypes.map(t => t.id).filter(id => !include.includes(id));
+        const unlocked = this.getUnlocked();
+        const pool = this.config.rodTypes.map(t => t.id)
+            .filter(id => !include.includes(id) && unlocked.rods.includes(id));
         const picked = [...include];
         while (picked.length < count && pool.length > 0) {
             picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
@@ -80,6 +89,50 @@ const RunManager = {
     },
 
     // ========================================
+    // 解禁（設計書5.8）と荒波レベル
+    // ========================================
+    // 解禁済みの竿のタイプと特殊餌。メタ（図鑑・最高ラウンド）から毎回計算する
+    getUnlocked(meta = SaveManager.loadMeta()) {
+        const fishCount = Object.values(meta.encyclopedia || {}).filter(e => e && e.count > 0).length;
+        const rods = ['all', 'strong'];
+        const baits = ['bait_neri'];
+        this.config.unlocks.forEach(u => {
+            if (!this.isUnlockMet(u, fishCount, meta.bestRound || 0)) return;
+            (u.kind === 'rod' ? rods : baits).push(u.id);
+        });
+        return { rods, baits, fishCount };
+    },
+
+    // 解禁済みの項目名の一覧
+    unlockLabels(meta = SaveManager.loadMeta()) {
+        const u = this.getUnlocked(meta);
+        return this.config.unlocks.filter(x => (x.kind === 'rod' ? u.rods : u.baits).includes(x.id)).map(x => x.label);
+    },
+
+    isUnlockMet(unlock, fishCount, bestRound) {
+        if (unlock.need.fish && fishCount < unlock.need.fish) return false;
+        if (unlock.need.round && bestRound < unlock.need.round) return false;
+        return true;
+    },
+
+    // 解禁条件の説明「図鑑5種」「R3到達」
+    unlockNeedText(unlock) {
+        return unlock.need.fish ? `図鑑${unlock.need.fish}種` : `R${unlock.need.round}クリア`;
+    },
+
+    // 今の荒波レベルで有効な条件をまとめる
+    getAscensionRules(level = this.run ? this.run.ascension || 0 : 0) {
+        const rules = { targetMult: 1, supplyDelta: 0, stockDelta: 0, rewardDelta: 0 };
+        this.config.ascension.filter(a => a.level <= level).forEach(a => {
+            if (a.targetMult) rules.targetMult += a.targetMult;
+            if (a.supplyDelta) rules.supplyDelta += a.supplyDelta;
+            if (a.stockDelta) rules.stockDelta += a.stockDelta;
+            if (a.rewardDelta) rules.rewardDelta += a.rewardDelta;
+        });
+        return rules;
+    },
+
+    // ========================================
     // ラウンド
     // ========================================
     getTarget(round, weatherId = null) {
@@ -94,6 +147,7 @@ const RunManager = {
 
         const weather = weatherId ? this.getWeather(weatherId) : null;
         if (weather) raw *= weather.targetMult;
+        raw *= this.getAscensionRules().targetMult;
 
         // キリのいい数字に丸める（1,000未満は10G単位、それ以上は100G単位）
         const unit = raw < 1000 ? 10 : 100;
@@ -135,6 +189,47 @@ const RunManager = {
         });
         return id;
     },
+    isNushiRound(round) {
+        return this.config.nushi.rounds.includes(round);
+    },
+
+    // ヌシに使う魚: 支給餌より1つ上のランクから選ぶ（称号付きとして扱う）
+    pickNushi(round) {
+        const order = ['D', 'C', 'B', 'A', 'S', 'SS'];
+        const supply = GAME_DATA.BAITS.find(b => b.id === this.getSupplyBait(round));
+        const rank = order[Math.min(order.indexOf(supply.rank) + 1, order.length - 2)];
+        const pool = GAME_DATA.FISH.filter(f => f.rarity === rank && f.specialTitle);
+        const fish = pool[Math.floor(Math.random() * pool.length)];
+        return { fishId: fish.id, name: `${fish.specialTitle}${fish.name}`, caught: false };
+    },
+
+    // この一投でヌシがかかるか（6投目以降、まだ釣っていなければ毎回）
+    shouldHookNushi() {
+        const run = this.run;
+        if (!run || !run.nushi || run.nushi.caught) return false;
+        return (run.roundCasts || 0) + 1 >= this.config.nushi.fromCast;
+    },
+
+    makeNushiFish() {
+        const nushi = this.run.nushi;
+        const base = GAME_DATA.FISH.find(f => f.id === nushi.fishId);
+        return {
+            ...base,
+            name: nushi.name,
+            hasTitle: true,
+            isNushi: true,
+            power: Math.round(base.power * this.config.nushi.powerMult),
+            price: Math.floor(base.price * GAME_DATA.TITLE_CONFIG.priceMultiplier)
+        };
+    },
+
+    onNushiCaught() {
+        if (!this.run.nushi) return;
+        this.run.nushi.caught = true;
+        SoundManager.play('goal');
+        UIManager.showNotification('ヌシを釣り上げた！', `${this.run.nushi.name}。釣り宿で特別スキルを1つ選べます`, 'emoji_events', 3000);
+    },
+
     canFish() {
         return !!this.run && this.run.phase === 'fishing';
     },
@@ -155,14 +250,18 @@ const RunManager = {
         run.earned = 0;
         run.reached = false;
         run.combo = 0;
+        run.chum = 0;
+        run.roundCasts = 0;
         run.phase = 'fishing';
         run.harbor = null;
+        run.nushi = this.isNushiRound(run.round) ? this.pickNushi(run.round) : null;
 
         // 餌を支給（買った餌は持ち越し）。支給分は余るとクリア時にボーナスへ換金される
         const supplyId = this.getSupplyBait(run.round);
         // carried = 前のラウンドから持ち越した同じ餌の数（クリア時の換金で買った餌を減らさないため）
-        run.supply = { id: supplyId, count: this.config.baitPerRound, carried: GameState.getBaitCount(supplyId) };
-        GameState.addBait(supplyId, this.config.baitPerRound);
+        const supplyCount = Math.max(1, this.config.baitPerRound + this.getAscensionRules().supplyDelta);
+        run.supply = { id: supplyId, count: supplyCount, carried: GameState.getBaitCount(supplyId) };
+        GameState.addBait(supplyId, supplyCount);
         GameState.baitType = supplyId;
         GameState.ensureUsableBait();
 
@@ -170,6 +269,13 @@ const RunManager = {
         if (weather.startFever && !GameState.fever.isActive) {
             GameState.fever.type = weather.startFever.type;
             GameState.fever.value = Math.max(GameState.fever.value, weather.startFever.value);
+        }
+
+        // 天体2つ: ラウンド開始時にフィーバーゲージ+2
+        if (!GameState.fever.isActive) {
+            GameState.getEffectsByType('family_fever_start').forEach(e => {
+                GameState.fever.value = Math.min(GameState.fever.value + e.value, 5);
+            });
         }
 
         // 空の見た目: 天候の空、なければラウンドごとの空
@@ -187,8 +293,9 @@ const RunManager = {
         const run = this.run;
         if (!run || run.phase !== 'fishing') return true;
 
-        // 目標達成: すぐには終わらず「宿へ戻る」を押すまで粘れる
-        if (!run.reached && run.earned >= run.target) {
+        // 目標達成: すぐには終わらず「宿へ戻る」を押すまで粘れる（ヌシのラウンドはヌシも必要）
+        const nushiDone = !run.nushi || run.nushi.caught;
+        if (!run.reached && run.earned >= run.target && nushiDone) {
             run.reached = true;
             SoundManager.play('goal');
             SaveManager.save();
@@ -242,12 +349,16 @@ const RunManager = {
         // 釣り宿フェーズに切り替えてから加算する（ボーナスは水揚げ額に数えない）
         run.phase = 'harbor';
         GameState.addMoney(clearBonus + leftoverBonus);
+        run.lastGrade = grade.id;
 
         const isFinalClear = run.round === cfg.finalRound;
         SaveManager.recordRun(run.round, false, isFinalClear);
         SoundManager.play('fanfare', { grade: grade.id });
 
-        const rewardCount = Math.max(2, grade.rewardChoices + (weather.rewardChoicesDelta || 0));
+        const rules = this.getAscensionRules();
+        const rewardCount = Math.max(2, grade.rewardChoices + (weather.rewardChoicesDelta || 0) + rules.rewardDelta);
+        // 商売4つ: 入れ替えが毎回1回無料
+        const familyRerolls = GameState.getEffectsByType('family_free_reroll').reduce((a, e) => a + e.value, 0);
         run.harbor = {
             summary: { earned: run.earned, target: run.target, grade: grade.id, clearBonus, leftover, leftoverBonus, isFinalClear },
             rewardTaken: false,
@@ -255,14 +366,18 @@ const RunManager = {
             shopSkills: [],
             baitStock: {},
             rerolls: 0,
-            freeRerolls: grade.freeRerolls,
+            freeRerolls: grade.freeRerolls + familyRerolls,
+            // ヌシを釣ったラウンドは特別スキルの3択
+            nushiOptions: run.nushi && run.nushi.caught ? this.pickSkills(this.config.nushi.rewardChoices, run.round + 1, [], false, 0) : [],
+            nushiTaken: false,
+            specialBait: this.pickSpecialBait(run.round + 1),
             spotOffers: this.createSpotOffers(run.round + 1),
             // 次の素材の竿（最上位の竿なら並ばない）
             rodOffers: GAME_DATA.RODS[GameState.rodRankIndex + 1] ? this.pickRodTypes(cfg.rodOfferChoices) : []
         };
         this.restockSkills();
         cfg.baitShop.forEach(item => {
-            if (item.fromRound <= run.round + 1) run.harbor.baitStock[item.id] = item.stock;
+            if (item.fromRound <= run.round + 1) run.harbor.baitStock[item.id] = Math.max(1, item.stock + rules.stockDelta);
         });
 
         SaveManager.save();
@@ -286,6 +401,7 @@ const RunManager = {
         const stats = this._stats();
         if (!stats) return;
         stats.casts++;
+        this.run.roundCasts = (this.run.roundCasts || 0) + 1;
         stats.catches++;
         this.run.combo++;
     },
@@ -294,6 +410,7 @@ const RunManager = {
         const stats = this._stats();
         if (!stats) return;
         stats.casts++;
+        this.run.roundCasts = (this.run.roundCasts || 0) + 1;
         stats.escapes++;
         stats.escapedPower += fish.power;
         this.breakCombo();
@@ -303,6 +420,7 @@ const RunManager = {
         const stats = this._stats();
         if (!stats) return;
         stats.casts++;
+        this.run.roundCasts = (this.run.roundCasts || 0) + 1;
         this.breakCombo();
     },
 
@@ -318,14 +436,18 @@ const RunManager = {
         // 図鑑をメタデータに反映してから釣り旅データを消す
         SaveManager.save();
         SaveManager.deleteSave();
+        SaveManager.setLastRun({ round: run.round, cleared: run.round - 1, earned: GameState.totalMoneyEarned });
+        const before = run.unlockedAtStart || [];
+        const newUnlocks = this.unlockLabels().filter(label => !before.includes(label));
         // 最高記録はラウンドクリア時に記録済みなので、ここでは釣り旅開始時点と比べる
-        HarborUI.showGameOver(run.round - 1 > run.previousBest);
+        HarborUI.showGameOver(run.round - 1 > run.previousBest, newUnlocks);
     },
 
     // 自分から釣り旅をやめる
     retire() {
         if (!this.run || this.run.phase === 'over') return;
         FishingGame.abort();
+        this.run.retired = true;
         this.gameOver();
     },
 
@@ -384,10 +506,10 @@ const RunManager = {
     },
 
     // 重複なしで count 個のスキルIDを抽選する
-    pickSkills(count, round, exclude = [], tierUp = false) {
+    pickSkills(count, round, exclude = [], tierUp = false, tier = null) {
         const ids = [];
         for (let i = 0; i < count; i++) {
-            const skill = this.pickSkill({ round, exclude: [...exclude, ...ids], tierUp });
+            const skill = this.pickSkill({ round, exclude: [...exclude, ...ids], tierUp, tier });
             if (skill) ids.push(skill.id);
         }
         return ids;
@@ -429,6 +551,21 @@ const RunManager = {
             .map(item => ({ ...item, stock: stock[item.id], price: this.getBaitPrice(item) }));
     },
 
+    // 釣り宿に並べる特殊餌（解禁済みから1種）
+    pickSpecialBait(round) {
+        const unlocked = this.getUnlocked().baits;
+        const pool = this.config.specialBaits.filter(b => unlocked.includes(b.id));
+        if (pool.length === 0) return null;
+        const item = pool[Math.floor(Math.random() * pool.length)];
+        const price = Math.max(20, Math.round(this.getTarget(round) * item.priceRate / 10) * 10);
+        return { id: item.id, quantity: item.quantity, price, sold: false };
+    },
+
+    getSpecialBaitPrice() {
+        const offer = this.run.harbor.specialBait;
+        return offer ? Math.floor(offer.price * (1.0 - GameState.getShopDiscount())) : 0;
+    },
+
     // ========================================
     // 釣り宿: 操作（成功したら true。保存まで行う）
     // ========================================
@@ -445,6 +582,25 @@ const RunManager = {
         const harbor = this.run.harbor;
         const ids = this.pickSkills(this.config.shopSkillCount, this.run.round + 1, harbor.rewardOptions);
         harbor.shopSkills = ids.map(id => ({ id, sold: false }));
+    },
+
+    chooseNushiReward(index) {
+        if (!this._inHarbor()) return false;
+        const harbor = this.run.harbor;
+        if (harbor.nushiTaken || !harbor.nushiOptions[index]) return false;
+        GameState.addSkill(harbor.nushiOptions[index]);
+        harbor.nushiTaken = true;
+        return this._commit();
+    },
+
+    buySpecialBait() {
+        if (!this._inHarbor()) return false;
+        const offer = this.run.harbor.specialBait;
+        if (!offer || offer.sold) return false;
+        if (!GameState.spendMoney(this.getSpecialBaitPrice())) return false;
+        GameState.addBait(offer.id, offer.quantity);
+        offer.sold = true;
+        return this._commit();
     },
 
     chooseReward(index) {
@@ -529,8 +685,10 @@ const RunManager = {
     },
 
     depart(index) {
-        if (!this._inHarbor() || !this.run.harbor.rewardTaken) return false;
-        const offer = this.run.harbor.spotOffers[index];
+        const harbor = this.run && this.run.harbor;
+        if (!this._inHarbor() || !harbor.rewardTaken) return false;
+        if (harbor.nushiOptions && harbor.nushiOptions.length && !harbor.nushiTaken) return false;
+        const offer = harbor.spotOffers[index];
         if (!offer) return false;
         this.startNextRound(offer);
         return true;

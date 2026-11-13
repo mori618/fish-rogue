@@ -82,6 +82,19 @@ const SaveManager = {
         this._write(this.META_KEY, meta);
     },
 
+    setLastRun(result) {
+        const meta = this.loadMeta();
+        meta.lastRun = result;
+        this._write(this.META_KEY, meta);
+    },
+
+    // チュートリアルの案内を見たことを記録する
+    markTutorial(key) {
+        const meta = this.loadMeta();
+        meta.tutorial = { ...meta.tutorial, [key]: true };
+        this._write(this.META_KEY, meta);
+    },
+
     // 釣り旅の結果を記録する。最高記録を更新したら true
     recordRun(clearedRounds, isNewRun = false, isClear = false) {
         const meta = this.loadMeta();
