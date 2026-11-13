@@ -20,6 +20,7 @@ const SaveManager = {
             baitType: gameState.baitType,
             run: gameState.run,
             rodRankIndex: gameState.rodRankIndex,
+            rodType: gameState.rodType,
             rodStarLevels: { ...gameState.rodStarLevels },
             unlockedRods: [...gameState.unlockedRods],
             equippedSkills: [...gameState.equippedSkills],

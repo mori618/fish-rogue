@@ -30,7 +30,6 @@ const HarborUI = {
     // ビルド帯（竿・パワー・スキル。アイコンをタップで詳細）
     // ----------------------------------------
     buildHtml() {
-        const rod = GameState.getCurrentRod();
         const slots = GameState.getSkillSlots();
         const equipped = GameState.equippedSkills;
 
@@ -58,7 +57,7 @@ const HarborUI = {
         return `
             <section class="rg-build">
                 <div class="rg-build-head">
-                    <span>${rod.name} <span class="rg-stars">${'★'.repeat(GameState.rodStars)}</span></span>
+                    <span title="${GameState.getRodType().description}">${GameState.getRodDisplayName()} <span class="rg-stars">${'★'.repeat(GameState.rodStars)}</span></span>
                     <span>パワー <strong>${GameState.getTotalPower()}</strong></span>
                     <span>スロット ${equipped.length}/${slots}</span>
                 </div>
@@ -174,7 +173,7 @@ const HarborUI = {
             <div class="rg-card-row rg-cols-4">${baitTiles}</div>
 
             <h3 class="rg-section-title"><span class="material-icons">phishing</span> 竿 <small>購入・強化のたびにスキルスロット+1</small></h3>
-            <div class="rg-card-row rg-cols-2">${this.rodHtml(money)}</div>
+            ${this.rodHtml(money)}
         `;
     },
 
@@ -182,27 +181,39 @@ const HarborUI = {
         const rod = GameState.getCurrentRod();
         const power = rod.basePower + rod.starPowerBonus * GameState.rodStars;
 
+        // 星強化（今の竿のまま）
         const upgradeCost = GameState.getUpgradeCost();
-        let html = upgradeCost === null
-            ? `<div class="rg-card rg-rod-card sold"><span class="rg-card-name">星強化</span><span class="rg-card-desc">最大まで強化済み</span></div>`
-            : `<button class="rg-card rg-rod-card" onclick="HarborUI.onUpgradeRod()">
-                    <span class="rg-card-name">星強化 ★${GameState.rodStars + 1}</span>
-                    <span class="rg-card-desc">竿パワー ${power}→${power + rod.starPowerBonus}、スロット+1</span>
+        const upgrade = upgradeCost === null
+            ? `<div class="rg-card rg-rod-card sold"><span class="rg-card-name">${GameState.getRodDisplayName()} 星強化</span><span class="rg-card-desc">最大まで強化済み</span></div>`
+            : `<button class="rg-card rg-rod-card rg-rod-row" onclick="HarborUI.onUpgradeRod()">
+                    <span class="rg-rod-row-text">
+                        <span class="rg-card-name">${GameState.getRodDisplayName()} 星強化 ★${GameState.rodStars + 1}</span>
+                        <span class="rg-card-desc">竿パワー ${power}→${power + rod.starPowerBonus}、スロット+1</span>
+                    </span>
                     ${this.priceHtml(upgradeCost, money)}
                </button>`;
 
+        // 次の素材の竿（タイプ違いで2本並ぶ。買えるのは1本）
         const nextIndex = GameState.rodRankIndex + 1;
         const nextRod = GAME_DATA.RODS[nextIndex];
-        html += nextRod
-            ? `<button class="rg-card rg-rod-card" onclick="HarborUI.onBuyRod()">
-                    <span class="rg-card-name">${nextRod.name}</span>
-                    <span class="rg-card-desc">竿パワー ${power}→${nextRod.basePower}（星は0から）、スロット+1</span>
-                    ${this.priceHtml(GameState.getRodPrice(nextIndex), money)}
-               </button>`
-            : `<div class="rg-card rg-rod-card sold"><span class="rg-card-name">買い替え</span><span class="rg-card-desc">最上位の竿です</span></div>`;
-        return html;
+        const offers = GameState.run.harbor.rodOffers || [];
+        let shelf = '';
+        if (!nextRod) {
+            shelf = '<div class="rg-empty-slot">最上位の素材の竿です</div>';
+        } else if (offers.length === 0) {
+            shelf = '<div class="rg-empty-slot">この宿の竿は売り切れました</div>';
+        } else {
+            shelf = `<div class="rg-card-row rg-cols-2">${offers.map((typeId, index) => `
+                <button class="rg-card rg-rod-card" onclick="HarborUI.onBuyRod(${index})">
+                    ${RodAnimator.previewSvg(typeId, nextIndex)}
+                    <span class="rg-card-name">${GameState.getRodDisplayName(nextIndex, typeId)}</span>
+                    <span class="rg-card-desc">${GameState.getRodType(typeId).description}</span>
+                    <span class="rg-card-desc">竿パワー ${power}→${nextRod.basePower}（星は0から）</span>
+                    ${this.priceHtml(GameState.getRodPrice(nextIndex, typeId), money)}
+                </button>`).join('')}</div>`;
+        }
+        return `<div class="rg-card-row">${upgrade}</div>${shelf}`;
     },
-
     // 価格。足りないときは不足額を出す
     priceHtml(price, money) {
         if (money >= price) return `<span class="rg-price">${price.toLocaleString()} G</span>`;
@@ -240,11 +251,13 @@ const HarborUI = {
     // 港: 入力ハンドラ
     // ========================================
     _after(success, failMessage = 'お金が足りません') {
+        SoundManager.play(success ? 'buy' : 'deny');
         if (!success) UIManager.showMessage(failMessage, 1500);
         this.render();
     },
 
     onChooseReward(index) {
+        SoundManager.play('select');
         const skillId = GameState.run.harbor.rewardOptions[index];
         if (RunManager.chooseReward(index)) {
             const equippedNow = GameState.getEquippedSkillCount(skillId) > 0;
@@ -264,7 +277,7 @@ const HarborUI = {
     onReroll() { this._after(RunManager.rerollSkills()); },
     onBuyBait(baitId) { this._after(RunManager.buyBait(baitId)); },
     onUpgradeRod() { this._after(RunManager.upgradeRod()); },
-    onBuyRod() { this._after(RunManager.buyNextRod()); },
+    onBuyRod(index) { this._after(RunManager.buyNextRod(index)); },
 
     onDepart(areaId) {
         if (!RunManager.depart(areaId)) {
@@ -339,7 +352,6 @@ const HarborUI = {
         const run = GameState.run;
         if (!run) return;
 
-        const rod = GameState.getCurrentRod();
         const area = GameState.getCurrentArea();
         const skills = GameState.equippedSkills.map(id => this.skillRow(id)).join('')
             || '<div class="rg-empty-slot">スキルを装備していません</div>';
@@ -351,7 +363,8 @@ const HarborUI = {
             </div>
             <div class="rg-modal-body">
                 <div class="rg-summary">
-                    <div class="rg-summary-row"><span>竿</span><strong>${rod.name} ${'★'.repeat(GameState.rodStars)}</strong></div>
+                    <div class="rg-summary-row"><span>竿</span><strong>${GameState.getRodDisplayName()} ${'★'.repeat(GameState.rodStars)}</strong></div>
+                    <div class="rg-summary-row"><span></span><span class="rg-area-desc">${GameState.getRodType().description}</span></div>
                     <div class="rg-summary-row"><span>釣りパワー</span><strong>${GameState.getTotalPower()}</strong></div>
                     <div class="rg-summary-row"><span>スキルスロット</span><strong>${GameState.equippedSkills.length} / ${GameState.getSkillSlots()}</strong></div>
                     ${area ? `<div class="rg-summary-row"><span>海域</span><strong>${area.name}</strong></div>
@@ -359,12 +372,44 @@ const HarborUI = {
                 </div>
                 <div class="shop-items">${skills}</div>
                 <p class="rg-note">装備の変更と買い物は、ラウンドをクリアした後の港で行えます。</p>
+                <button class="rg-sound-btn" onclick="UIManager.toggleSound()"></button>
                 <button class="btn-nav rg-retire-btn" onclick="HarborUI.onRetire()">この航海をリタイアする</button>
             </div>
         `);
         overlay.addEventListener('click', e => {
             if (e.target === overlay) this.closeModal('build-modal');
         });
+        UIManager.updateSoundButtons();
+    },
+
+    // ========================================
+    // 釣り旅の最初の竿選び（万能竿＋ランダム2タイプ）
+    // ========================================
+    showRodChoice() {
+        const run = GameState.run;
+        if (!run || run.phase !== 'setup') return;
+        const rod = GAME_DATA.RODS[0];
+
+        const cards = run.startRods.map(typeId => `
+            <button class="rg-card rg-rod-card rg-start-rod" onclick="HarborUI.onChooseStartRod('${typeId}')">
+                ${RodAnimator.previewSvg(typeId, 0)}
+                <span class="rg-card-name">${GameState.getRodDisplayName(0, typeId)}</span>
+                <span class="rg-card-desc">${GameState.getRodType(typeId).description}</span>
+            </button>
+        `).join('');
+
+        this.openModal('rod-choice-modal', `
+            <div class="modal-header">
+                <h2><span class="material-icons">phishing</span> 最初の竿を選ぶ</h2>
+            </div>
+            <p class="rg-note">竿パワー ${rod.basePower} の木の竿です。タイプで得意なことが変わります。</p>
+            <div class="rg-start-rod-list">${cards}</div>
+        `);
+    },
+
+    onChooseStartRod(typeId) {
+        SoundManager.play('select');
+        if (RunManager.chooseStartRod(typeId)) this.closeModal('rod-choice-modal');
     },
 
     skillRow(skillId) {

@@ -20,8 +20,9 @@ const RunManager = {
             round: 0,
             target: 0,
             earned: 0,
-            phase: 'harbor',   // 'fishing' | 'harbor' | 'over'
+            phase: 'setup',    // 'setup'（最初の竿選び） | 'fishing' | 'harbor' | 'over'
             harbor: null,      // 港にいる間だけ持つ状態（報酬候補・品揃えなど）
+            startRods: this.pickRodTypes(this.config.startRodChoices, ['all']), // 最初に選べる竿のタイプ
             area: 'offshore',  // 今いる海域
             reached: false,    // このラウンドの目標を達成したか（達成後は「帰港」で港へ）
             combo: 0,          // 連続成功数
@@ -30,7 +31,27 @@ const RunManager = {
             previousBest: SaveManager.loadMeta().bestRound // 航海開始時点の最高記録
         };
         SaveManager.recordRun(0, true);
+        SaveManager.save();
+        HarborUI.showRodChoice();
+    },
+
+    // 最初の竿を選んで出発する
+    chooseStartRod(typeId) {
+        const run = this.run;
+        if (!run || run.phase !== 'setup' || !run.startRods.includes(typeId)) return false;
+        GameState.rodType = typeId;
         this.startNextRound('offshore');
+        return true;
+    },
+
+    // 竿のタイプを重複なしで count 個選ぶ（include は必ず含める）
+    pickRodTypes(count, include = []) {
+        const pool = this.config.rodTypes.map(t => t.id).filter(id => !include.includes(id));
+        const picked = [...include];
+        while (picked.length < count && pool.length > 0) {
+            picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        }
+        return picked;
     },
 
     // 中断した航海を再開する。再開できなければ false
@@ -41,7 +62,10 @@ const RunManager = {
         GameState.init(saveData);
         FishingGame.init();
 
-        if (this.run.phase === 'harbor') {
+        if (this.run.phase === 'setup') {
+            UIManager.showScreen('start');
+            HarborUI.showRodChoice();
+        } else if (this.run.phase === 'harbor') {
             UIManager.showScreen('harbor');
         } else {
             UIManager.showScreen('fishing');
@@ -134,6 +158,7 @@ const RunManager = {
         // 目標達成: すぐには終わらず「帰港」を押すまで粘れる
         if (!run.reached && run.earned >= run.target) {
             run.reached = true;
+            SoundManager.play('goal');
             SaveManager.save();
             UIManager.updateStatus();
             UIManager.showNotification('目標達成！',
@@ -189,6 +214,7 @@ const RunManager = {
 
         const isFinalClear = run.round === cfg.finalRound;
         SaveManager.recordRun(run.round, false, isFinalClear);
+        SoundManager.play('fanfare', { grade: grade.id });
 
         const rewardCount = Math.max(2, grade.rewardChoices + ((area && area.rewardChoicesDelta) || 0));
         run.harbor = {
@@ -199,7 +225,9 @@ const RunManager = {
             baitStock: {},
             rerolls: 0,
             freeRerolls: grade.freeRerolls,
-            areaOffers: this.pickAreas()
+            areaOffers: this.pickAreas(),
+            // 次の素材の竿（最上位の竿なら並ばない）
+            rodOffers: GAME_DATA.RODS[GameState.rodRankIndex + 1] ? this.pickRodTypes(cfg.rodOfferChoices) : []
         };
         this.restockSkills();
         cfg.baitShop.forEach(item => {
@@ -263,6 +291,7 @@ const RunManager = {
     gameOver() {
         const run = this.run;
         run.phase = 'over';
+        SoundManager.play('gameover');
 
         // 図鑑をメタデータに反映してから航海データを消す
         SaveManager.save();
@@ -452,11 +481,14 @@ const RunManager = {
         return this._commit();
     },
 
-    buyNextRod() {
-        if (!this._inHarbor() || !GameState.buyNextRod()) return false;
+    buyNextRod(index) {
+        if (!this._inHarbor()) return false;
+        const harbor = this.run.harbor;
+        const typeId = harbor.rodOffers[index];
+        if (!typeId || !GameState.buyNextRod(typeId)) return false;
+        harbor.rodOffers = [];   // 棚の竿は1本だけ買える
         return this._commit();
     },
-
     // 装備 ⇔ 解除。結果は { can, reason } で返す
     toggleSkill(skillId, equip) {
         if (!this._inHarbor()) return { can: false, reason: '装備の変更は港でのみできます' };

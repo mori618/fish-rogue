@@ -54,7 +54,36 @@ const RodAnimator = {
         fishScale: { D: 0.7, C: 0.9, B: 1.15, A: 1.45, S: 1.8, SS: 2.2 },
         fishColor: { D: '#bcaaa4', C: '#22c55e', B: '#3b82f6', A: '#a855f7', S: '#f59e0b', SS: '#ef4444' },
 
-        feverColor: { sun: '#ffd54f', moon: '#bfdbfe' }
+        feverColor: { sun: '#ffd54f', moon: '#bfdbfe' },
+
+        // 竿のタイプごとの形と動き（GameState.rodType）
+        //   length = 竿の長さの倍率、butt/tip = 根元と先の太さ、bendMax = しなりやすさ、
+        //   guides = ガイドの数、reel = リールの半径、springs = バネの上書き（しなりの残り方・振りの速さ）
+        rodTypes: {
+            all: { length: 1.0, butt: 14, tip: 3, bendMax: 0.95, guides: 4, reel: 16, springs: {} },
+            strong: {
+                length: 0.84, butt: 20, tip: 5, bendMax: 0.55, guides: 4, reel: 21,
+                springs: { bend: { k: 260, c: 18 } }
+            },
+            soft: {
+                length: 1.12, butt: 11, tip: 2, bendMax: 1.3, guides: 5, reel: 14,
+                springs: { bend: { k: 110, c: 5 }, angle: { k: 100, c: 11 } }
+            },
+            quick: {
+                length: 0.86, butt: 12, tip: 3, bendMax: 0.9, guides: 3, reel: 13,
+                springs: { angle: { k: 210, c: 21 }, bend: { k: 230, c: 14 } }
+            },
+            probe: { length: 1.0, butt: 13, tip: 3, bendMax: 1.0, guides: 4, reel: 16, bell: true, springs: {} }
+        },
+
+        // 素材ごとの模様と金具の色（RODS のインデックス順: 木・竹・カーボン・チタン・伝説）
+        materials: [
+            { pattern: 'wood', metal: '#ffd54f', reel: '#d4a017' },
+            { pattern: 'bamboo', metal: '#ffd54f', reel: '#c08a2e' },
+            { pattern: 'gloss', metal: '#e5e7eb', reel: '#374151' },
+            { pattern: 'gloss', metal: '#f8fafc', reel: '#9ca3af' },
+            { pattern: 'legend', metal: '#ffd700', reel: '#facc15' }
+        ]
     },
 
     // ========================================
@@ -84,7 +113,11 @@ const RodAnimator = {
     shadow: { alpha: 0, target: 0, scale: 1 },
     bangTime: -10,       // 「！」を出した時刻
     reelAngle: 0,
+    reelClick: 0,        // リールの音を鳴らした回数（回転角から計算）
     nextIdleRipple: 0,
+    shape: null,         // 今の竿の形（CONFIG.rodTypes のどれか）
+    material: null,      // 今の竿の素材（CONFIG.materials のどれか）
+    bell: { x: 0, v: 0 },  // 探り竿の鈴の揺れ
 
     // ========================================
     // 初期化
@@ -116,10 +149,17 @@ const RodAnimator = {
             <text id="rs-bang" text-anchor="middle" font-size="56" font-weight="900" fill="#ffd700"
                 stroke="#b91c1c" stroke-width="3" paint-order="stroke" opacity="0">！</text>
             <g id="rs-rod">
+                <circle id="rs-glow" r="14" fill="#ffd700" opacity="0"/>
                 <path id="rs-shaft" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+                <path id="rs-gloss" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="1.5" stroke-linecap="round"/>
+                <path id="rs-nodes" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="2.5"/>
                 <path id="rs-grip" fill="none" stroke="#3e2723" stroke-width="17" stroke-linecap="round"/>
                 <path id="rs-wraps" fill="none" stroke="#ffd54f" stroke-width="14"/>
-                <g id="rs-guides">${'<circle r="4" fill="none" stroke="#ffd54f" stroke-width="2"/>'.repeat(4)}</g>
+                <g id="rs-guides">${'<circle r="4" fill="none" stroke="#ffd54f" stroke-width="2"/>'.repeat(5)}</g>
+                <g id="rs-bell" opacity="0">
+                    <line id="rs-bell-string" stroke="#3e2723" stroke-width="1.2"/>
+                    <circle id="rs-bell-body" r="5.5" fill="#facc15" stroke="#92400e" stroke-width="1.2"/>
+                </g>
                 <circle id="rs-reel" r="16" fill="#d4a017" stroke="#5d4037" stroke-width="3"/>
                 <line id="rs-reel-arm" stroke="#4e342e" stroke-width="3" stroke-linecap="round"/>
                 <circle id="rs-reel-knob" r="4" fill="#4e342e"/>
@@ -134,6 +174,8 @@ const RodAnimator = {
             fish: q('rs-fish'), fishBody: q('rs-fish-body'),
             drops: [...q('rs-drops').children], bang: q('rs-bang'),
             shaft: q('rs-shaft'), grip: q('rs-grip'), wraps: q('rs-wraps'),
+            glow: q('rs-glow'), gloss: q('rs-gloss'), nodes: q('rs-nodes'),
+            bell: q('rs-bell'), bellString: q('rs-bell-string'), bellBody: q('rs-bell-body'),
             guides: [...q('rs-guides').children],
             reel: q('rs-reel'), reelArm: q('rs-reel-arm'), reelKnob: q('rs-reel-knob')
         };
@@ -225,6 +267,15 @@ const RodAnimator = {
         this.els.bobBody.setAttribute('fill', skin.bobberColor);
         this.stars = GameState.rodStars || 0;
 
+        this.shape = this.CONFIG.rodTypes[GameState.rodType] || this.CONFIG.rodTypes.all;
+        this.material = this.CONFIG.materials[GameState.rodRankIndex] || this.CONFIG.materials[0];
+        this.els.guides.forEach(el => el.setAttribute('stroke', this.material.metal));
+        this.els.wraps.setAttribute('stroke', this.material.metal);
+        this.els.reel.setAttribute('fill', this.material.reel);
+        this.els.reel.setAttribute('r', this.shape.reel);
+        this.els.bell.setAttribute('opacity', this.shape.bell ? 1 : 0);
+        if (this.layout) this.resize();
+
         const fever = GameState.fever;
         const glow = fever && fever.isActive ? this.CONFIG.feverColor[fever.type] : null;
         this.els.line.setAttribute('stroke', glow || 'rgba(255,255,255,0.8)');
@@ -275,6 +326,7 @@ const RodAnimator = {
                 break;
 
             case 'hit':
+                SoundManager.play('hit');
                 this._applyPose('hit');
                 this._ensureFloating();
                 v.bend.v += 3;
@@ -298,6 +350,7 @@ const RodAnimator = {
                 break;
 
             case 'success':
+                SoundManager.play('catch', { rarity: this.options.rarity, treasure: this.options.treasure });
                 this._applyPose('success');
                 v.angle.v -= 4;
                 this._startFishJump();
@@ -306,6 +359,7 @@ const RodAnimator = {
                 break;
 
             case 'fail':
+                SoundManager.play('escape');
                 this._applyPose('fail');
                 // 負荷が抜けて竿が後ろへ跳ね返り、ウキだけが浮き上がる
                 if (v.bend.x > 0.2) {
@@ -325,6 +379,8 @@ const RodAnimator = {
         const v = this.values;
         this._ensureFloating();
         v.dip.v += 150 * Math.min(scale, 2.5);
+        this.bell.v += 9 * (Math.random() < 0.5 ? -1 : 1);   // 探り竿の鈴が鳴る
+        SoundManager.play(this.shape && this.shape.bell ? 'bell' : 'nibble', { scale });
         v.bend.v += 1.2 * scale;
         v.slack.v -= 3;
         this.shadow.scale = scale;
@@ -334,6 +390,60 @@ const RodAnimator = {
     // ゲージの針の位置（0〜100）。バトル中の竿のしなりに使う
     setGauge(position) {
         this.gauge = position;
+    },
+
+    // ========================================
+    // 竿選びの画面用: その竿の形を静止画（SVG文字列）で返す
+    // ========================================
+    previewSvg(typeId, rodIndex = 0) {
+        const shape = this.CONFIG.rodTypes[typeId] || this.CONFIG.rodTypes.all;
+        const material = this.CONFIG.materials[rodIndex] || this.CONFIG.materials[0];
+        const rod = GAME_DATA.RODS[rodIndex];
+        const skin = GAME_DATA.SKINS.find(sk => sk.rodId === rod.id) || GAME_DATA.SKINS[0];
+
+        // 竿を寝かせて、少ししならせた形で描く（グリップが左下、竿先が右上）
+        const steps = 16;
+        const length = 150 * shape.length;
+        const bend = 0.35 * shape.bendMax;
+        let x = 20;
+        let y = 76;
+        const pts = [{ x, y, dir: 1.15 }];
+        for (let i = 1; i <= steps; i++) {
+            const dir = 1.15 - bend * Math.pow(i / steps, 1.6);
+            x += Math.sin(dir) * length / steps;
+            y -= Math.cos(dir) * length / steps;
+            pts.push({ x, y, dir });
+        }
+        const left = [];
+        const right = [];
+        pts.forEach((p, i) => {
+            const half = (shape.butt - (shape.butt - shape.tip) * (i / steps)) / 2 * 0.7;
+            const nx = Math.cos(p.dir) * half;
+            const ny = Math.sin(p.dir) * half;
+            left.push(`${(p.x - nx).toFixed(1)},${(p.y - ny).toFixed(1)}`);
+            right.push(`${(p.x + nx).toFixed(1)},${(p.y + ny).toFixed(1)}`);
+        });
+        const at = s => pts[Math.round(s * steps)];
+        const guides = Array.from({ length: shape.guides }, (_, i) => {
+            const p = at(0.48 + 0.47 * (shape.guides === 1 ? 1 : i / (shape.guides - 1)));
+            return `<circle cx="${(p.x + Math.cos(p.dir) * 5).toFixed(1)}" cy="${(p.y + Math.sin(p.dir) * 5).toFixed(1)}" r="2.6" fill="none" stroke="${material.metal}" stroke-width="1.4"/>`;
+        }).join('');
+        const g0 = at(0);
+        const g1 = at(0.24);
+        const reel = at(0.17);
+        const tip = pts[steps];
+        const bell = shape.bell
+            ? `<line x1="${at(0.94).x.toFixed(1)}" y1="${at(0.94).y.toFixed(1)}" x2="${at(0.94).x.toFixed(1)}" y2="${(at(0.94).y + 11).toFixed(1)}" stroke="#3e2723" stroke-width="1"/><circle cx="${at(0.94).x.toFixed(1)}" cy="${(at(0.94).y + 14).toFixed(1)}" r="4" fill="#facc15" stroke="#92400e"/>`
+            : '';
+        const glow = material.pattern === 'legend'
+            ? `<circle cx="${tip.x.toFixed(1)}" cy="${tip.y.toFixed(1)}" r="9" fill="#ffd700" opacity="0.35"/>` : '';
+        return `<svg viewBox="0 0 170 104" class="rg-rod-preview" aria-hidden="true">
+            ${glow}
+            <path d="M${left.join('L')}L${right.reverse().join('L')}Z" fill="${skin.rodColor}" stroke="rgba(0,0,0,0.35)"/>
+            <line x1="${g0.x.toFixed(1)}" y1="${g0.y.toFixed(1)}" x2="${g1.x.toFixed(1)}" y2="${g1.y.toFixed(1)}" stroke="#3e2723" stroke-width="${(shape.butt * 0.85).toFixed(1)}" stroke-linecap="round"/>
+            <circle cx="${(reel.x + Math.cos(reel.dir) * (shape.reel * 0.7 + 2)).toFixed(1)}" cy="${(reel.y + Math.sin(reel.dir) * (shape.reel * 0.7 + 2)).toFixed(1)}" r="${(shape.reel * 0.7).toFixed(1)}" fill="${material.reel}" stroke="#5d4037" stroke-width="2"/>
+            ${guides}${bell}
+        </svg>`;
     },
 
     // ========================================
@@ -360,6 +470,7 @@ const RodAnimator = {
         this.values.dip.x = splash ? 10 : 0;
         this.values.dip.v = 0;
         if (splash) {
+            SoundManager.play('land');
             this._ripple(water.x, water.y, 30);
             this._splash(water.x, water.y, 5, 0.7);
         }
@@ -407,10 +518,12 @@ const RodAnimator = {
 
     // 竿の中心線を計算する。グリップから竿先へ進むにつれて、しなりの分だけ向きが変わる
     _computeRod() {
-        const { grip, length } = this.layout;
+        const { grip } = this.layout;
+        const shape = this.shape || this.CONFIG.rodTypes.all;
+        const length = this.layout.length * shape.length;
         const n = this.CONFIG.segments;
         const angle = this.values.angle.x;
-        const bend = this.values.bend.x * this.CONFIG.bendMax;
+        const bend = this.values.bend.x * shape.bendMax;
         const step = length / n;
         const points = [{ x: grip.x, y: grip.y, dir: angle }];
         let x = grip.x;
@@ -474,9 +587,10 @@ const RodAnimator = {
         }
 
         // --- バネ ---
+        const overrides = (this.shape && this.shape.springs) || {};
         Object.keys(cfg.springs).forEach(name => {
             const s = v[name];
-            const { k, c } = cfg.springs[name];
+            const { k, c } = overrides[name] || cfg.springs[name];
             s.v += (-k * (s.x - s.target) - c * s.v) * dt;
             s.x += s.v * dt;
         });
@@ -528,11 +642,24 @@ const RodAnimator = {
             if (this.fish.age >= this.fish.life) this.fish = null;
         }
         this.shadow.alpha += (this.shadow.target - this.shadow.alpha) * Math.min(1, dt * 6);
+
+        // 探り竿の鈴: 竿先の動きにつられて揺れる
+        const b = this.bell;
+        b.v += (-90 * b.x - 4 * b.v - v.bend.v * 2.5 * calm) * dt;
+        b.x += b.v * dt;
+
+        // バトル中のリールの音（ハンドルが1/4回転するたびに鳴らす）
+        const click = Math.floor(this.reelAngle / (Math.PI / 2));
+        if (click !== this.reelClick) {
+            this.reelClick = click;
+            if (this.state === 'battle') SoundManager.play('reel');
+        }
     },
 
     // キャスト: 竿先からウキを放ち、弧を描いて着水点へ飛ばす
     _release() {
         this.released = true;
+        SoundManager.play('cast');
         const tip = this.rod ? this.rod.tip : this.layout.grip;
         this.bobber.mode = 'fly';
         this.bobber.flight = {
@@ -557,7 +684,8 @@ const RodAnimator = {
         const left = [];
         const right = [];
         points.forEach((p, i) => {
-            const half = (14 - 11 * (i / (points.length - 1))) / 2;
+            const shape = this.shape || this.CONFIG.rodTypes.all;
+            const half = (shape.butt - (shape.butt - shape.tip) * (i / (points.length - 1))) / 2;
             const nx = Math.cos(p.dir);
             const ny = -Math.sin(p.dir);
             left.push(`${n(p.x - nx * half)},${n(p.y - ny * half)}`);
@@ -579,19 +707,71 @@ const RodAnimator = {
         }
         els.wraps.setAttribute('d', wraps);
 
-        [0.48, 0.66, 0.82, 0.95].forEach((s, i) => {
+        // ガイド: 竿の中ほどから竿先まで等間隔に並べる（数はタイプで変わる）
+        const shape = this.shape || this.CONFIG.rodTypes.all;
+        els.guides.forEach((el, i) => {
+            if (i >= shape.guides) {
+                el.setAttribute('opacity', 0);
+                return;
+            }
+            const s = 0.48 + (0.95 - 0.48) * (shape.guides === 1 ? 1 : i / (shape.guides - 1));
             const p = this._pointAt(s);
-            els.guides[i].setAttribute('cx', n(p.x - Math.cos(p.dir) * 7));
-            els.guides[i].setAttribute('cy', n(p.y + Math.sin(p.dir) * 7));
+            el.setAttribute('opacity', 1);
+            el.setAttribute('cx', n(p.x - Math.cos(p.dir) * 7));
+            el.setAttribute('cy', n(p.y + Math.sin(p.dir) * 7));
         });
 
+        // 素材の模様: 竹の節、カーボン・チタン・伝説の光沢
+        const pattern = this.material ? this.material.pattern : 'wood';
+        let nodes = '';
+        if (pattern === 'bamboo') {
+            [0.36, 0.48, 0.6, 0.71, 0.81, 0.9].forEach(s => {
+                const p = this._pointAt(s);
+                const w = (shape.butt - (shape.butt - shape.tip) * s) / 2 + 1;
+                const nx = Math.cos(p.dir) * w;
+                const ny = -Math.sin(p.dir) * w;
+                nodes += `M${n(p.x - nx)},${n(p.y - ny)}L${n(p.x + nx)},${n(p.y + ny)}`;
+            });
+        }
+        els.nodes.setAttribute('d', nodes);
+        let gloss = '';
+        if (pattern === 'gloss' || pattern === 'legend') {
+            for (let s = 0.3; s <= 0.92; s += 0.04) {
+                const p = this._pointAt(s);
+                const w = (shape.butt - (shape.butt - shape.tip) * s) / 4;
+                gloss += `${gloss ? 'L' : 'M'}${n(p.x - Math.cos(p.dir) * w)},${n(p.y + Math.sin(p.dir) * w)}`;
+            }
+        }
+        els.gloss.setAttribute('d', gloss);
+
+        // 伝説の竿: 竿先がゆっくり明滅する
+        const tipPoint = this.rod.tip;
+        els.glow.setAttribute('cx', n(tipPoint.x));
+        els.glow.setAttribute('cy', n(tipPoint.y));
+        els.glow.setAttribute('opacity', pattern === 'legend'
+            ? (0.25 + 0.2 * Math.sin(this.time * 2.4) * (this.reducedMotion ? 0 : 1)).toFixed(2) : 0);
+
+        // 探り竿の鈴: 竿先の少し手前から下げる
+        if (shape.bell) {
+            const p = this._pointAt(0.93);
+            const swing = Math.max(-0.9, Math.min(0.9, this.bell.x));
+            const bx = p.x + Math.sin(swing) * 14;
+            const by = p.y + Math.cos(swing) * 14;
+            els.bellString.setAttribute('x1', n(p.x));
+            els.bellString.setAttribute('y1', n(p.y));
+            els.bellString.setAttribute('x2', n(bx));
+            els.bellString.setAttribute('y2', n(by));
+            els.bellBody.setAttribute('cx', n(bx));
+            els.bellBody.setAttribute('cy', n(by + 4));
+        }
+
         const reelAt = this._pointAt(0.17);
-        const reelX = reelAt.x - Math.cos(reelAt.dir) * 18;
-        const reelY = reelAt.y + Math.sin(reelAt.dir) * 18;
+        const reelX = reelAt.x - Math.cos(reelAt.dir) * (shape.reel + 2);
+        const reelY = reelAt.y + Math.sin(reelAt.dir) * (shape.reel + 2);
         els.reel.setAttribute('cx', n(reelX));
         els.reel.setAttribute('cy', n(reelY));
-        const knobX = reelX + Math.cos(this.reelAngle) * 15;
-        const knobY = reelY + Math.sin(this.reelAngle) * 15;
+        const knobX = reelX + Math.cos(this.reelAngle) * (shape.reel - 1);
+        const knobY = reelY + Math.sin(this.reelAngle) * (shape.reel - 1);
         els.reelArm.setAttribute('x1', n(reelX));
         els.reelArm.setAttribute('y1', n(reelY));
         els.reelArm.setAttribute('x2', n(knobX));

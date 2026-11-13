@@ -796,6 +796,73 @@ body[data-screen="harbor"] .notification-banner {
     border-radius: var(--radius-md);
 }
 
+/* 竿の棚とプレビュー */
+.rg-rod-preview {
+    width: 100%;
+    max-width: 150px;
+    height: auto;
+}
+
+.rg-rod-row {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+    width: 100%;
+    margin-bottom: var(--spacing-sm);
+}
+
+.rg-rod-row-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* 最初の竿選び */
+.rg-start-rod-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    overflow-y: auto;
+}
+
+.rg-start-rod {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    grid-template-areas: "pic name" "pic desc";
+    align-items: center;
+    column-gap: var(--spacing-md);
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.rg-start-rod .rg-rod-preview { grid-area: pic; }
+.rg-start-rod .rg-card-name { grid-area: name; font-size: 15px; align-self: end; }
+.rg-start-rod .rg-card-desc { grid-area: desc; font-size: 13px; align-self: start; }
+
+/* 効果音のオン／オフ */
+.rg-sound-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin-top: var(--spacing-md);
+    padding: 6px 16px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 22px;
+    cursor: pointer;
+}
+
+.rg-modal .rg-sound-btn {
+    width: 100%;
+    justify-content: center;
+    margin: 0 0 var(--spacing-sm);
+}
+
 /* フッター: 海域カード＝出航ボタン */
 .rg-harbor-footer {
     flex-direction: column;

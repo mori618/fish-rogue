@@ -826,6 +826,7 @@ const FishingGame = {
 
         let zone = UIManager.getGaugeZone(this.gaugePosition);
         RunManager.recordZone(zone);
+        SoundManager.play('stop', { zone });
 
         // 起死回生スキル: 白ゾーンを緑扱いにすることがある
         if (zone === 'white' && Math.random() < GameState.getSecondChanceRate()) {

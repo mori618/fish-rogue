@@ -29,8 +29,13 @@ const UIManager = {
             document.body.dataset.screen = screenId;
         }
 
-        // 竿の描画ループは釣り画面にいる間だけ動かす
-        if (screenId !== 'fishing') RodAnimator.stop();
+        // 竿の描画ループと波の音は釣り画面にいる間だけ動かす
+        if (screenId !== 'fishing') {
+            RodAnimator.stop();
+            SoundManager.stopAmbient();
+        } else {
+            SoundManager.startAmbient();
+        }
 
         // 画面固有の初期化
         if (screenId === 'start') {
@@ -58,6 +63,8 @@ const UIManager = {
             continueBtn.classList.toggle('hidden', !SaveManager.hasSaveData());
         }
 
+        this.updateSoundButtons();
+
         const record = document.getElementById('start-record');
         if (record) {
             const meta = SaveManager.loadMeta();
@@ -65,6 +72,19 @@ const UIManager = {
                 ? `最高記録: ラウンド${meta.bestRound} クリア${meta.clears > 0 ? ` ／ 航海達成 ${meta.clears}回` : ''}`
                 : '';
         }
+    },
+
+    // 効果音のオン／オフ表示（タイトルと装備画面のボタン）
+    updateSoundButtons() {
+        document.querySelectorAll('.rg-sound-btn').forEach(btn => {
+            btn.innerHTML = `<span class="material-icons">${SoundManager.enabled ? 'volume_up' : 'volume_off'}</span> 効果音 ${SoundManager.enabled ? 'オン' : 'オフ'}`;
+        });
+    },
+
+    toggleSound() {
+        SoundManager.unlock();
+        SoundManager.toggle();
+        this.updateSoundButtons();
     },
 
     // ========================================
@@ -101,6 +121,8 @@ const UIManager = {
             ? document.getElementById('shop-money-display')
             : document.getElementById('money-display');
         if (!target || !target.parentElement) return;
+
+        if (diff > 0) SoundManager.play('coin', { combo: GameState.run ? GameState.run.combo : 0 });
 
         const popup = document.createElement('span');
         popup.className = `rg-money-popup ${diff > 0 ? 'plus' : 'minus'}`;

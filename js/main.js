@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const on = (id, handler) => document.getElementById(id).addEventListener('click', handler);
 
+    // ブラウザは最初のタップまで音を出せないので、タップのたびに音声を有効にする（2回目以降は何もしない）
+    document.addEventListener('pointerdown', () => SoundManager.unlock(), true);
+
     // ========================================
     // スタート画面
     // ========================================
@@ -29,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     on('encyclopedia-back-btn', () => UIManager.showScreen('start'));
+    on('sound-btn', () => UIManager.toggleSound());
 
     // ========================================
     // 釣り画面

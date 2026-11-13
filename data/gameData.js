@@ -1042,6 +1042,40 @@ const ROGUE_CONFIG = {
         { id: 'bait_s', quantity: 3, price: 1200, stock: 3, fromRound: 6 }
     ],
 
+    // --- 竿のタイプ（素材 × タイプ。素材は RODS の5段階、タイプは個性） ---
+    // effects はその竿を持っている間だけ装備される見えないスキルとして扱う
+    rodMaterials: ['木', '竹', 'カーボン', 'チタン', '伝説'],
+    rodTypes: [
+        {
+            id: 'all', name: '万能竿', priceMult: 0.8,
+            description: '特別な効果はない。値段が2割安い',
+            effects: []
+        },
+        {
+            id: 'strong', name: '剛竿', priceMult: 1.0,
+            description: 'パワー+20%。ゲージが15%速い',
+            effects: [{ type: 'overdrive', power: 0.2, speed: 0.15 }]
+        },
+        {
+            id: 'soft', name: '軟竿', priceMult: 1.0,
+            description: '赤ゾーンの幅+30%。パワー-15%',
+            effects: [{ type: 'red_zone_boost', value: 0.3 }, { type: 'overdrive', power: -0.15, speed: 0 }]
+        },
+        {
+            id: 'quick', name: '早竿', priceMult: 1.0,
+            description: '待ち時間-30%。コンボの上限+2（最大+70%）。パワー-10%',
+            effects: [{ type: 'wait_time_reduction', value: 0.3 }, { type: 'overdrive', power: -0.1, speed: 0 }],
+            comboStacks: 2
+        },
+        {
+            id: 'probe', name: '探り竿', priceMult: 1.0,
+            description: '宝箱の出現率+5%、称号付きの出現率2倍。売値-10%',
+            effects: [{ type: 'treasure_boost', value: 0.05 }, { type: 'title_boost', value: 2 }, { type: 'price_boost', value: -0.1 }]
+        }
+    ],
+    startRodChoices: 3,             // 釣り旅の開始時に選べる竿の数（万能竿＋ランダム）
+    rodOfferChoices: 2,             // 釣り宿の竿の棚に並ぶ、次の素材の竿の数
+
     // --- 竿（ローグライト版の価格表。原作の RODS.price / upgradeCosts は使わない） ---
     rodPrices: [0, 500, 2000, 6000, 18000],
     rodUpgradeCosts: [

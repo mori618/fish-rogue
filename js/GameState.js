@@ -21,7 +21,8 @@ const GameState = {
     // ========================================
     // 釣り竿の状態
     // ========================================
-    rodRankIndex: 0,
+    rodRankIndex: 0,      // 竿の素材（RODS のインデックス）
+    rodType: 'all',       // 竿のタイプ（ROGUE_CONFIG.rodTypes の id）
     rodStarLevels: {},  // 竿インデックスごとの星数 { 0: 2, 1: 0 }
     unlockedRods: [0],
     equippedSkills: [],
@@ -83,6 +84,7 @@ const GameState = {
         this.run = s.run ? JSON.parse(JSON.stringify(s.run)) : null;
 
         this.rodRankIndex = s.rodRankIndex || 0;
+        this.rodType = s.rodType || 'all';
         this.rodStarLevels = { 0: 0, ...(s.rodStarLevels || {}) };
         this.unlockedRods = [...(s.unlockedRods || [0])];
         this.equippedSkills = [...(s.equippedSkills || [])];
@@ -175,7 +177,25 @@ const GameState = {
     getComboBonus() {
         if (!this.run) return 0;
         const cfg = GAME_DATA.ROGUE_CONFIG.combo;
-        return Math.min(this.run.combo || 0, cfg.maxStacks) * cfg.step;
+        return Math.min(this.run.combo || 0, this.getComboMaxStacks()) * cfg.step;
+    },
+
+    // コンボの上限（早竿で増える）
+    getComboMaxStacks() {
+        return GAME_DATA.ROGUE_CONFIG.combo.maxStacks + (this.getRodType().comboStacks || 0);
+    },
+
+    // ========================================
+    // 竿のタイプ
+    // ========================================
+    getRodType(typeId = this.rodType) {
+        const types = GAME_DATA.ROGUE_CONFIG.rodTypes;
+        return types.find(t => t.id === typeId) || types[0];
+    },
+
+    // 「竹の剛竿」のような表示名
+    getRodDisplayName(rodIndex = this.rodRankIndex, typeId = this.rodType) {
+        return `${GAME_DATA.ROGUE_CONFIG.rodMaterials[rodIndex]}の${this.getRodType(typeId).name}`;
     },
 
     // 今いる海域（ラウンド中のみ）
@@ -235,20 +255,21 @@ const GameState = {
     // 釣り竿（購入・強化）
     // 価格は ROGUE_CONFIG.rodPrices / rodUpgradeCosts
     // ========================================
-    getRodPrice(rodIndex) {
-        const base = GAME_DATA.ROGUE_CONFIG.rodPrices[rodIndex];
+    getRodPrice(rodIndex, typeId = 'all') {
+        const base = GAME_DATA.ROGUE_CONFIG.rodPrices[rodIndex] * this.getRodType(typeId).priceMult;
         return Math.floor(base * (1.0 - this.getShopDiscount()));
     },
 
     // 次の竿に買い替える（買ったらそのまま持ち替える）
-    buyNextRod() {
+    buyNextRod(typeId) {
         const nextIndex = this.rodRankIndex + 1;
         if (!GAME_DATA.RODS[nextIndex]) return false;
-        if (!this.spendMoney(this.getRodPrice(nextIndex))) return false;
+        if (!this.spendMoney(this.getRodPrice(nextIndex, typeId))) return false;
 
         this.unlockedRods.push(nextIndex);
         this.rodStarLevels[nextIndex] = 0;
         this.rodRankIndex = nextIndex;
+        this.rodType = typeId;
         return true;
     },
 
@@ -1008,6 +1029,9 @@ const GameState = {
 
             this._collectEffects(skill.effect, type, effects);
         }
+        // 竿のタイプの効果は「その竿を持っている間だけ装備される見えないスキル」として混ぜる
+        this.getRodType().effects.forEach(effect => this._collectEffects(effect, type, effects));
+
         // 海域の効果は「その海域にいる間だけ装備される見えないスキル」として混ぜる
         const area = this.getCurrentArea();
         if (area) {
