@@ -249,7 +249,9 @@ const UIManager = {
 
         const casts = GameState.getTotalBaitCount();
         const need = run.target - run.earned;
-        const danger = run.phase === 'fishing' && !run.reached && casts > 0 && casts <= 5;
+        // 目標額に届いた直後（宿へ戻れる判定の前）にも呼ばれるので、ヌシ待ちのときだけ「ヌシがまだ」を出す
+        const nushiPending = !!(run.nushi && !run.nushi.caught);
+        const danger = run.phase === 'fishing' && !run.reached && casts > 0 && casts <= 5 && (need > 0 || nushiPending);
         warning.classList.toggle('hidden', !danger);
         screen.classList.toggle('rg-danger', danger);
         if (danger) {
@@ -445,6 +447,51 @@ const UIManager = {
         this.updateRodView('idle');
         this.hideGauge();
     },
+    // ========================================
+    // 引き寄せ（パワーが勝っていてもすぐには釣れず、魚が引く手応えを見せる）
+    // ========================================
+    showTug(fish) {
+        const fishingArea = document.getElementById('fishing-area');
+        if (!fishingArea) return;
+        fishingArea.innerHTML = `
+            <div class="rg-tug">
+                <div class="rg-tug-text">ぐっ！</div>
+                <div class="rg-tug-bar"><span id="tug-bar-fill"></span></div>
+                <div class="rg-tug-hint">連打で早く巻ける</div>
+            </div>
+        `;
+        this.jolt(fish && ['B', 'A', 'S', 'SS'].includes(fish.rarity) ? 'strong' : 'normal');
+    },
+
+    // 巻き上げの進み具合（0〜1）
+    updateTug(progress) {
+        const fill = document.getElementById('tug-bar-fill');
+        if (fill) fill.style.width = `${Math.round(progress * 100)}%`;
+    },
+
+    // 連打したとき: 文字が弾む
+    pulseTug() {
+        const text = document.querySelector('.rg-tug-text');
+        if (!text) return;
+        text.textContent = ['ぐいっ', '巻け！', 'ぐぐっ'][Math.floor(Math.random() * 3)];
+        text.classList.remove('rg-pop');
+        void text.offsetWidth;
+        text.classList.add('rg-pop');
+    },
+
+    // 魚に引かれた瞬間: 竿と水面が揺れ、端末が震える
+    jolt(power = 'normal') {
+        const scene = document.getElementById('rod-scene');
+        if (scene) {
+            scene.classList.remove('rg-jolt', 'rg-jolt-strong');
+            void scene.getBoundingClientRect();
+            scene.classList.add(power === 'strong' ? 'rg-jolt-strong' : 'rg-jolt');
+        }
+        if (navigator.vibrate) {
+            try { navigator.vibrate(power === 'strong' ? [60, 40, 90] : [40, 30, 50]); } catch (e) { /* 対応していない端末 */ }
+        }
+    },
+
     // ========================================
     // 釣り竿の状態更新
     // ========================================

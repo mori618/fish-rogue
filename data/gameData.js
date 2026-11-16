@@ -744,6 +744,15 @@ const GAUGE_CONFIG = {
 // 釣りサイクル設定
 // ========================================
 const FISHING_CONFIG = {
+    // 引き寄せ（パワーで勝っている魚でも、少しのあいだ引かれる手応え）
+    //   長さ = baseMs + ratioMs × (魚のパワー ÷ 自分のパワー) + ランクごとの追加。タップ1回で tapMs 縮む
+    tug: {
+        baseMs: 700,
+        ratioMs: 900,
+        rankExtra: { D: 0, C: 200, B: 400, A: 600, S: 800, SS: 1000 },
+        tapMs: 220
+    },
+
     // ウキが揺れるまでの待機時間（ミリ秒）
     waitTimeMin: 2000,
     waitTimeMax: 6000,
