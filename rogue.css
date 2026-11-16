@@ -2126,3 +2126,41 @@ body[data-screen="harbor"] .rg-tip {
     80% { transform: translate(-2px, 2px); }
     100% { transform: translate(0, 0); }
 }
+
+/* ページ内の確認ダイアログ */
+.rg-confirm {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.rg-confirm-box {
+    width: min(86vw, 360px);
+    padding: var(--sp-5) var(--sp-4) var(--sp-4);
+    color: var(--text-primary);
+    background: #4e342e;
+    background-image: var(--wood-grain);
+    border: 2px solid #8d6e63;
+    border-radius: 16px;
+}
+
+.rg-confirm-box p {
+    margin: 0 0 var(--sp-4);
+    font-size: var(--fs-md);
+    line-height: 1.6;
+}
+
+.rg-confirm-actions {
+    display: flex;
+    gap: var(--sp-2);
+}
+
+.rg-confirm-actions .btn {
+    flex: 1;
+    min-height: 44px;
+    font-size: var(--fs-sm);
+}
