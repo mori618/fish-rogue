@@ -721,9 +721,10 @@ const HarborUI = {
     },
 
     onRetire() {
-        if (!window.confirm('この釣り旅を終了しますか？（進行状況は失われます）')) return;
-        this.closeModal('build-modal');
-        RunManager.retire();
+        UIManager.confirmDialog('この釣り旅を終了しますか？（進行状況は失われます）', '終了する', () => {
+            this.closeModal('build-modal');
+            RunManager.retire();
+        });
     },
 
     // ========================================

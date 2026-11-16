@@ -112,6 +112,28 @@ const UIManager = {
         }
     },
 
+    // 確認ダイアログ（window.confirm は埋め込み先によっては使えないので、ページ内に出す）
+    confirmDialog(message, okLabel, onOk) {
+        document.querySelectorAll('.rg-confirm').forEach(el => el.remove());
+        const overlay = document.createElement('div');
+        overlay.className = 'rg-confirm';
+        overlay.innerHTML = `
+            <div class="rg-confirm-box">
+                <p>${message}</p>
+                <div class="rg-confirm-actions">
+                    <button class="btn rg-btn-secondary" data-act="cancel">やめる</button>
+                    <button class="btn rg-btn-danger" data-act="ok">${okLabel}</button>
+                </div>
+            </div>`;
+        overlay.addEventListener('click', e => {
+            const act = e.target.closest('[data-act]');
+            if (!act && e.target !== overlay) return;
+            overlay.remove();
+            if (act && act.dataset.act === 'ok') onOk();
+        });
+        document.body.appendChild(overlay);
+    },
+
     // 初めての釣り旅の案内（同じ案内は一度だけ）
     showTip(key, text) {
         const meta = SaveManager.loadMeta();

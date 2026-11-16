@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // スタート画面
     // ========================================
     on('start-btn', () => {
-        if (SaveManager.hasSaveData() &&
-            !window.confirm('進行中の釣り旅があります。破棄して新しく始めますか？')) {
+        if (SaveManager.hasSaveData()) {
+            UIManager.confirmDialog('進行中の釣り旅があります。破棄して新しく始めますか？', '新しく始める', () => RunManager.startNewRun());
             return;
         }
         RunManager.startNewRun();
