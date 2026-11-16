@@ -349,6 +349,19 @@ const RodAnimator = {
                 this.shadow.target = 0.45;
                 break;
 
+            case 'tug':
+                // 合わせた直後に魚が走る: 竿が大きく引き込まれ、ウキが沈む
+                SoundManager.play('hit');
+                this._applyPose('battle');
+                this._ensureFloating();
+                v.bend.v += 5;
+                v.angle.v += 2.5;
+                v.dip.v += 220;
+                this.shadow.target = 0.5;
+                this._splash(water.x, water.y, 12, 1.4);
+                this._ripple(water.x, water.y, 50);
+                break;
+
             case 'success':
                 SoundManager.play('catch', { rarity: this.options.rarity, treasure: this.options.treasure });
                 this._applyPose('success');
@@ -385,6 +398,16 @@ const RodAnimator = {
         v.slack.v -= 3;
         this.shadow.scale = scale;
         this._ripple(this.layout.water.x, this.layout.water.y, 20 + 10 * scale);
+    },
+
+    // 引き寄せ中のタップ: 竿をあおって巻く。魚が引き返す
+    pull() {
+        if (!this.els) return;
+        const v = this.values;
+        v.angle.v -= 1.6;
+        v.bend.v += 1.5;
+        this.reelAngle += Math.PI / 2;
+        this._ripple(this.layout.water.x + v.sweep.x, this.layout.water.y, 18);
     },
 
     // ゲージの針の位置（0〜100）。バトル中の竿のしなりに使う
@@ -571,6 +594,19 @@ const RodAnimator = {
                 this._ripple(water.x, water.y, 18);
                 this.nextIdleRipple = this.time + 2.6;
             }
+        } else if (this.state === 'tug') {
+            // ぐいぐい引かれる: しなりが脈打ち、糸の先が左右に走る
+            const level = cfg.battle[this.options.matchup] || cfg.battle.even;
+            const pulse = Math.pow(Math.abs(Math.sin(this.time * 5.5)), 3);
+            const tremble = Math.sin(this.time * 47) * level.tremble * 6 * calm;
+            v.bend.target = 0.35 + 0.45 * pulse * level.strength + tremble;
+            v.angle.target = cfg.poses.battle.angle + 0.06 * pulse;
+            v.dip.target = 30 + 25 * pulse;
+            v.sweep.target = Math.sin(this.time * 3.1) * 0.06 * width * calm;
+            this.reelAngle += dt * 6;
+            if (Math.floor(this.time * 5) !== Math.floor((this.time - dt) * 5)) {
+                this._ripple(water.x + v.sweep.x, water.y, 12);
+            }
         } else if (this.state === 'battle') {
             // 針が中央（赤ゾーン）に近いほど大きくしなる。格上ほど強く、竿先が震える
             const level = cfg.battle[this.options.matchup] || cfg.battle.even;
@@ -652,7 +688,7 @@ const RodAnimator = {
         const click = Math.floor(this.reelAngle / (Math.PI / 2));
         if (click !== this.reelClick) {
             this.reelClick = click;
-            if (this.state === 'battle') SoundManager.play('reel');
+            if (this.state === 'battle' || this.state === 'tug') SoundManager.play('reel');
         }
     },
 

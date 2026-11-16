@@ -680,6 +680,11 @@ const FishingGame = {
                 // ゲージバトル中のクリック
                 this.resolveCatch();
                 break;
+
+            case 'tug':
+                // 引き寄せ中は連打で巻く（失敗にはならない）
+                this.reelIn();
+                break;
         }
     },
 
@@ -708,13 +713,49 @@ const FishingGame = {
         const isForcedBattle = ['A', 'S', 'SS'].includes(this.currentFish.rarity) || this.currentFish.isNushi;
 
         if (playerPower >= fishPower && !isForcedBattle) {
-            // 即座に釣り上げ成功
-            this.catchSuccess();
+            // パワーで勝っていても、少しのあいだ魚が引く（連打で早く巻ける）
+            this.startTug(playerPower, fishPower);
         } else {
+            // ゲージバトルの前に、ぐっと引かれる揺れを入れる
+            UIManager.jolt('strong');
             // ゲージバトルへ移行（ヌシは前の一投で勝った連戦の続きから）
             this.battlePhase = this.currentFish.isNushi ? (GameState.run.nushi.won || 0) + 1 : 1;
             this.startGaugeBattle(playerPower, fishPower);
         }
+    },
+
+    // ========================================
+    // 引き寄せ（手応えの演出）
+    // ========================================
+    // 長さは魚の強さで決まる（パワー差が小さいほど・ランクが高いほど長い）。タップするたびに短くなる
+    startTug(playerPower, fishPower) {
+        const cfg = GAME_DATA.FISHING_CONFIG.tug;
+        const ratio = Math.min(1, fishPower / Math.max(1, playerPower));
+        const rankExtra = cfg.rankExtra[this.currentFish.rarity] || 0;
+        this.tugTotal = cfg.baseMs + cfg.ratioMs * ratio + rankExtra;
+        this.tugLeft = this.tugTotal;
+        this.state = 'tug';
+
+        UIManager.showTug(this.currentFish);
+        UIManager.updateRodView('tug', { matchup: ratio > 0.7 ? 'even' : 'easy', rarity: this.currentFish.rarity });
+
+        const step = 50;
+        this.tugTimer = setInterval(() => {
+            this.tugLeft -= step;
+            UIManager.updateTug(1 - Math.max(0, this.tugLeft) / this.tugTotal);
+            if (this.tugLeft <= 0) {
+                clearInterval(this.tugTimer);
+                this.tugTimer = null;
+                this.catchSuccess();
+            }
+        }, step);
+    },
+
+    // 引き寄せ中のタップ: 巻き取って残り時間を縮める
+    reelIn() {
+        this.tugLeft -= GAME_DATA.FISHING_CONFIG.tug.tapMs;
+        RodAnimator.pull();
+        UIManager.pulseTug();
     },
 
     // ========================================
@@ -1103,6 +1144,8 @@ const FishingGame = {
         clearTimeout(this.waitTimer);
         clearTimeout(this.nibbleTimer);
         clearTimeout(this.hitTimer);
+        clearInterval(this.tugTimer);
+        this.tugTimer = null;
         cancelAnimationFrame(this.gaugeAnimationId);
         this.waitTimer = null;
         this.nibbleTimer = null;
