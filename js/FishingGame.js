@@ -682,8 +682,7 @@ const FishingGame = {
                 break;
 
             case 'tug':
-                // 引き寄せ中は連打で巻く（失敗にはならない）
-                this.reelIn();
+                // 引き寄せ中のタップは何もしない（失敗にもならない）
                 break;
         }
     },
@@ -727,7 +726,7 @@ const FishingGame = {
     // ========================================
     // 引き寄せ（手応えの演出）
     // ========================================
-    // 長さは魚の強さで決まる（パワー差が小さいほど・ランクが高いほど長い）。タップするたびに短くなる
+    // 長さは魚の強さで決まる（パワー差が小さいほど・ランクが高いほど長い）
     startTug(playerPower, fishPower) {
         const cfg = GAME_DATA.FISHING_CONFIG.tug;
         const ratio = Math.min(1, fishPower / Math.max(1, playerPower));
@@ -739,23 +738,10 @@ const FishingGame = {
         UIManager.showTug(this.currentFish);
         UIManager.updateRodView('tug', { matchup: ratio > 0.7 ? 'even' : 'easy', rarity: this.currentFish.rarity });
 
-        const step = 50;
-        this.tugTimer = setInterval(() => {
-            this.tugLeft -= step;
-            UIManager.updateTug(1 - Math.max(0, this.tugLeft) / this.tugTotal);
-            if (this.tugLeft <= 0) {
-                clearInterval(this.tugTimer);
-                this.tugTimer = null;
-                this.catchSuccess();
-            }
-        }, step);
-    },
-
-    // 引き寄せ中のタップ: 巻き取って残り時間を縮める
-    reelIn() {
-        this.tugLeft -= GAME_DATA.FISHING_CONFIG.tug.tapMs;
-        RodAnimator.pull();
-        UIManager.pulseTug();
+        this.tugTimer = setTimeout(() => {
+            this.tugTimer = null;
+            this.catchSuccess();
+        }, this.tugTotal);
     },
 
     // ========================================
@@ -1144,7 +1130,7 @@ const FishingGame = {
         clearTimeout(this.waitTimer);
         clearTimeout(this.nibbleTimer);
         clearTimeout(this.hitTimer);
-        clearInterval(this.tugTimer);
+        clearTimeout(this.tugTimer);
         this.tugTimer = null;
         cancelAnimationFrame(this.gaugeAnimationId);
         this.waitTimer = null;

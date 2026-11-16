@@ -400,16 +400,6 @@ const RodAnimator = {
         this._ripple(this.layout.water.x, this.layout.water.y, 20 + 10 * scale);
     },
 
-    // 引き寄せ中のタップ: 竿をあおって巻く。魚が引き返す
-    pull() {
-        if (!this.els) return;
-        const v = this.values;
-        v.angle.v -= 1.6;
-        v.bend.v += 1.5;
-        this.reelAngle += Math.PI / 2;
-        this._ripple(this.layout.water.x + v.sweep.x, this.layout.water.y, 18);
-    },
-
     // ゲージの針の位置（0〜100）。バトル中の竿のしなりに使う
     setGauge(position) {
         this.gauge = position;
