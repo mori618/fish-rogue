@@ -475,30 +475,9 @@ const UIManager = {
     showTug(fish) {
         const fishingArea = document.getElementById('fishing-area');
         if (!fishingArea) return;
-        fishingArea.innerHTML = `
-            <div class="rg-tug">
-                <div class="rg-tug-text">ぐっ！</div>
-                <div class="rg-tug-bar"><span id="tug-bar-fill"></span></div>
-                <div class="rg-tug-hint">連打で早く巻ける</div>
-            </div>
-        `;
+        // 文字は出さず、竿のしなり・揺れ・振動だけで手応えを見せる
+        fishingArea.innerHTML = '';
         this.jolt(fish && ['B', 'A', 'S', 'SS'].includes(fish.rarity) ? 'strong' : 'normal');
-    },
-
-    // 巻き上げの進み具合（0〜1）
-    updateTug(progress) {
-        const fill = document.getElementById('tug-bar-fill');
-        if (fill) fill.style.width = `${Math.round(progress * 100)}%`;
-    },
-
-    // 連打したとき: 文字が弾む
-    pulseTug() {
-        const text = document.querySelector('.rg-tug-text');
-        if (!text) return;
-        text.textContent = ['ぐいっ', '巻け！', 'ぐぐっ'][Math.floor(Math.random() * 3)];
-        text.classList.remove('rg-pop');
-        void text.offsetWidth;
-        text.classList.add('rg-pop');
     },
 
     // 魚に引かれた瞬間: 竿と水面が揺れ、端末が震える
