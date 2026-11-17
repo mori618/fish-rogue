@@ -186,13 +186,19 @@ const FishingGame = {
                 targetPool.forEach(f => totalHWeight += f.weight);
                 let r = Math.random() * totalHWeight;
 
+                // 鳥が連れてきた魚は少し弱らせて判定する（上位の魚にパワーが届きやすく）
+                const birdFish = fish => ({
+                    ...fish,
+                    fromBird: true,
+                    power: Math.round(fish.power * GAME_DATA.ROGUE_CONFIG.birdPowerRate)
+                });
                 for (const fish of targetPool) {
                     r -= fish.weight;
                     if (r < 0) {
-                        return { ...fish };
+                        return birdFish(fish);
                     }
                 }
-                return { ...targetPool[0] };
+                return birdFish(targetPool[0]);
             }
         }
         // 餌ごとの出現確率DCBAS（定数を書き換えないようコピーして使う）
@@ -1408,8 +1414,10 @@ const FishingGame = {
             console.log('🦅 イベント: 海鳥飛来');
             UIManager.showBirdEvent();
 
-            // 効果発動: 次回上位確定
+            // 効果発動: 次回上位確定（画面にも出す）
             GameState.setHighTierGuaranteed(true);
+            UIManager.showMessage('海鳥が来た！ 次の一投は上位の魚が確定', 2200);
+            UIManager.updateStatus();
             console.log('✨ 海鳥効果: 次回上位確定');
         } else {
             console.log('🍃 イベントなし');

@@ -2209,3 +2209,9 @@ body[data-screen="harbor"] .rg-tip {
     from { transform: scaleY(1); }
     to { transform: scaleY(-0.35); }
 }
+
+.rg-chip-bird {
+    color: #1c1410;
+    font-weight: 700;
+    background: #bae6fd;
+}

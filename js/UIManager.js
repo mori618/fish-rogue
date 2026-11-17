@@ -378,6 +378,13 @@ const UIManager = {
             }
         }
 
+        // 海鳥: 次の一投は上位の魚が確定
+        const birdChip = document.getElementById('bird-chip');
+        if (birdChip) {
+            birdChip.classList.toggle('hidden', !GameState.highTierGuaranteed);
+            birdChip.textContent = '上位確定';
+        }
+
         // まき餌の残り投数
         const chumChip = document.getElementById('chum-chip');
         if (chumChip) {
