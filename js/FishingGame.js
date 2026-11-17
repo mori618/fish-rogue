@@ -410,7 +410,8 @@ const FishingGame = {
         const castBait = GameState.getBaitData();
         if (castBait && castBait.special === 'maki') {
             GameState.useBait(true);
-            GameState.run.chum = (GameState.run.chum || 0) + castBait.chum.casts;
+            const chumExtra = GameState.getEffectsByType('chum_master').reduce((a, e) => a + e.value, 0);
+            GameState.run.chum = (GameState.run.chum || 0) + castBait.chum.casts + chumExtra;
             SoundManager.play('cast');
             UIManager.showMessage(`まき餌！ 次の${GameState.run.chum}投は待ち時間半分・2匹釣り+30%`, 1800);
             GameState.ensureUsableBait();
@@ -420,6 +421,14 @@ const FishingGame = {
             RunManager.checkRoundEnd();
             return true;
         }
+
+        // この一投だけの売値の倍率: 最後の一投（餌が残り1個）と宝の勢い（宝箱のあと）
+        const run = GameState.run;
+        const lastCast = GameState.getTotalBaitCount() === 1
+            ? GameState.getEffectsByType('last_cast').reduce((m, e) => Math.max(m, e.value), 1) : 1;
+        run.castLastMult = lastCast;
+        run.castMomentum = run.momentum || 0;
+        run.momentum = 0;
 
         SaveManager.countCast();
         this.state = 'casting';
@@ -808,7 +817,7 @@ const FishingGame = {
 
     // ゲージバトルの連戦数（ヌシ3、S以上2、それ以外1）
     getBattlePhases(fish) {
-        if (fish.isNushi) return GAME_DATA.ROGUE_CONFIG.nushi.phases;
+        if (fish.isNushi) return RunManager.getNushiPhases();
         return ['S', 'SS'].includes(fish.rarity) ? 2 : 1;
     },
 
@@ -1123,6 +1132,10 @@ const FishingGame = {
     // ラウンドの決着（目標達成・餌切れ）を判定し、続行なら待機状態に戻る
     // ========================================
     endTurn(allowEvent = false) {
+        if (GameState.run) {
+            GameState.run.castLastMult = 1;
+            GameState.run.castMomentum = 0;
+        }
         // まき餌の効果は魚がかかった一投ごとに1つ減る
         if (this.chumCast && GameState.run && GameState.run.chum > 0) GameState.run.chum--;
         this.chumCast = false;
@@ -1168,6 +1181,10 @@ const FishingGame = {
     // 宝箱の中身決定と処理
     // ========================================
     processTreasureChest(chest) {
+        // 宝の勢い: 宝箱を開けたら次の一投の売値が上がる
+        const momentum = GameState.getEffectsByType('treasure_momentum').reduce((m, e) => Math.max(m, e.value), 0);
+        if (momentum > 0 && GameState.run) GameState.run.momentum = momentum;
+
         const type = chest.treasureType;
         const lootTable = GAME_DATA.TREASURE_CONFIG.lootTables[type];
         const results = [];

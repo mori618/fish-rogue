@@ -170,9 +170,35 @@ const GameState = {
 
     // 魚1匹あたりの売値（スキル・天候・コンボ・本日の高値の補正込み）
     getSalePrice(fish) {
-        // 本日の高値の魚は売値が上がる
-        const highValue = this.run && this.run.highValue === fish.id ? GAME_DATA.ROGUE_CONFIG.highValueMult : 1;
-        return Math.floor(fish.price * highValue * (1 + this.getPriceBonus()) * (1 + this.getComboBonus()));
+        // 本日の高値の魚は売値が上がる（相場師でさらに上がる）
+        let highValue = 1;
+        if (this.run && this.run.highValue === fish.id) {
+            highValue = GAME_DATA.ROGUE_CONFIG.highValueMult;
+            this.getEffectsByType('speculator').forEach(e => { highValue += e.value; });
+        }
+        // 土地勘: その釣り場でよく釣れる魚
+        let local = 0;
+        const spot = this.getCurrentSpot ? this.getCurrentSpot() : null;
+        if (spot && spot.fish.includes(fish.id)) {
+            this.getEffectsByType('local_knowledge').forEach(e => { local += e.value; });
+        }
+        return Math.floor(fish.price * highValue * (1 + this.getPriceBonus() + local) * (1 + this.getComboBonus()) * this.getCastPriceMult());
+    },
+
+    // この一投だけの売値の倍率（最後の一投・宝の勢い）。FishingGame がキャスト時に決める
+    getCastPriceMult() {
+        if (!this.run) return 1;
+        return (this.run.castLastMult || 1) * (1 + (this.run.castMomentum || 0));
+    },
+
+    // 装備スキルに、その効果の種類があるか（getEffectsByType を通さずに見る。天候の効果を選ぶときに使う）
+    hasSkillEffect(type) {
+        return this.equippedSkills.some(id => {
+            const skill = this.getSkillData(id);
+            if (!skill || !skill.effect) return false;
+            const effects = skill.effect.type === 'hybrid' ? skill.effect.effects : [skill.effect];
+            return effects.some(e => e.type === type);
+        });
     },
 
     // 連続成功コンボによる売値ボーナス（0.1 = +10%）
@@ -445,6 +471,12 @@ const GameState = {
         overdriveEffects.forEach(effect => {
             multiplier += effect.power;
         });
+
+        // 背水: 目標に届いていない状態で餌が残り3個以下
+        const run = this.run;
+        if (run && run.phase === 'fishing' && !run.reached && run.earned < run.target && this.getTotalBaitCount() <= 3) {
+            this.getEffectsByType('last_stand').forEach(effect => { multiplier += effect.value; });
+        }
 
         // 早打ち: 売値が下がる代わりにパワーが上がる
         this.getEffectsByType('quick_hit_penalty').forEach(effect => {
@@ -1130,7 +1162,12 @@ const GameState = {
         // 天候の効果は「その天候の間だけ装備される見えないスキル」として混ぜる
         const weather = this.getCurrentWeather();
         if (weather) {
-            weather.effects.forEach(effect => this._collectEffects(effect, type, effects));
+            // 荒天慣れ: 嵐でゲージが速くなる効果だけを外す
+            const calm = weather.id === 'storm' && this.hasSkillEffect('storm_veteran');
+            weather.effects.forEach(effect => {
+                if (calm && effect.type === 'gauge_slow' && effect.value < 0) return;
+                this._collectEffects(effect, type, effects);
+            });
         }
 
         // 系統ボーナス

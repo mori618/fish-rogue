@@ -1201,37 +1201,37 @@ const ROGUE_CONFIG = {
     families: [
         {
             id: 'might', name: '剛腕', icon: 'fitness_center', rodType: 'strong',
-            types: ['power_boost', 'overdrive', 'big_game_boost', 'count_skill_power', 'quick_hit_penalty'],
+            types: ['power_boost', 'overdrive', 'big_game_boost', 'count_skill_power', 'quick_hit_penalty', 'last_stand', 'nushi_hunter'],
             bonus2: { text: 'パワー+15%', effects: [{ type: 'overdrive', power: 0.15, speed: 0 }] },
             bonus4: { text: 'パワーが魚の1.5倍以上なら必ず2匹', effects: [{ type: 'family_overpower_double', ratio: 1.5 }] }
         },
         {
             id: 'skill', name: '技巧', icon: 'my_location', rodType: 'soft',
-            types: ['gauge_slow', 'red_zone_boost', 'second_chance', 'perfect_catch', 'master_needle', 'hit_window_mult', 'nibble_fix', 'auto_hit'],
+            types: ['gauge_slow', 'red_zone_boost', 'second_chance', 'perfect_catch', 'master_needle', 'hit_window_mult', 'nibble_fix', 'auto_hit', 'combo_keep', 'storm_veteran'],
             bonus2: { text: '赤ゾーンの幅+20%', effects: [{ type: 'red_zone_boost', value: 0.2 }] },
             bonus4: { text: '赤ゾーンで止めると餌が減らない', effects: [{ type: 'family_red_bait_save' }] }
         },
         {
             id: 'trade', name: '商売', icon: 'payments', rodType: null,
-            types: ['price_boost', 'high_risk_sell', 'shop_discount', 'upgrade_discount'],
+            types: ['price_boost', 'high_risk_sell', 'shop_discount', 'upgrade_discount', 'frugal', 'greedy', 'speculator', 'regular_customer'],
             bonus2: { text: '売値+15%', effects: [{ type: 'price_boost', value: 0.15 }] },
             bonus4: { text: '釣り宿の入れ替えが毎回1回無料', effects: [{ type: 'family_free_reroll', value: 1 }] }
         },
         {
             id: 'treasure', name: '宝探し', icon: 'card_giftcard', rodType: 'probe',
-            types: ['treasure_boost', 'treasure_quantity', 'treasure_quality', 'magnet', 'title_boost', 'bird_event_boost'],
+            types: ['treasure_boost', 'treasure_quantity', 'treasure_quality', 'magnet', 'title_boost', 'bird_event_boost', 'local_knowledge', 'treasure_momentum'],
             bonus2: { text: '宝箱の出現率+5%', effects: [{ type: 'treasure_boost', value: 0.05 }] },
             bonus4: { text: '宝箱のお金が2倍', effects: [{ type: 'family_treasure_money', value: 2 }] }
         },
         {
             id: 'sky', name: '天体', icon: 'auto_awesome', rodType: null,
-            types: ['fever_charge', 'fever_long', 'fever_bias_sun', 'fever_bias_moon', 'moon_rare_up', 'sun_chest_up', 'fever_treasure_boost', 'eternal_mania', 'cosmic_blessing', 'boat_event_boost'],
+            types: ['fever_charge', 'fever_long', 'fever_bias_sun', 'fever_bias_moon', 'moon_rare_up', 'sun_chest_up', 'fever_treasure_boost', 'eternal_mania', 'cosmic_blessing', 'boat_event_boost', 'fever_combo'],
             bonus2: { text: 'ラウンド開始時にフィーバーゲージ+2', effects: [{ type: 'family_fever_start', value: 2 }] },
             bonus4: { text: 'フィーバー中は餌が減らない', effects: [{ type: 'family_fever_bait_save' }] }
         },
         {
             id: 'school', name: '群れ', icon: 'waves', rodType: 'quick',
-            types: ['multi_catch_2', 'multi_catch_3', 'bait_save', 'rare_boost', 'rank_collector', 'wait_time_reduction', 'catch_boost'],
+            types: ['multi_catch_2', 'multi_catch_3', 'bait_save', 'rare_boost', 'rank_collector', 'wait_time_reduction', 'catch_boost', 'last_cast', 'chum_master'],
             bonus2: { text: '2匹釣りの確率+10%', effects: [{ type: 'multi_catch_2', value: 0.1 }] },
             bonus4: { text: 'コンボの上限+5（最大+100%）', effects: [{ type: 'family_combo_stacks', value: 5 }] }
         }
@@ -1313,6 +1313,44 @@ const ROGUE_CONFIG = {
         }
     ]
 };
+
+
+// ローグライト版で追加したスキル（餌の数・コンボ・評価・釣り場・ヌシ・釣り宿に絡むもの）
+const ROGUE_SKILLS = [
+    { id: 'last_cast_1', name: '最後の一投 I', description: '最後の1個の餌で釣った魚の売値が1.5倍', effect: { type: 'last_cast', value: 1.5 }, price: 0, tier: 1, group: 'ローグ', icon: 'hourglass_bottom' },
+    { id: 'last_cast_2', name: '最後の一投 II', description: '最後の1個の餌で釣った魚の売値が2倍', effect: { type: 'last_cast', value: 2 }, price: 0, tier: 2, group: 'ローグ', icon: 'hourglass_bottom' },
+    { id: 'last_cast_3', name: '最後の一投 III', description: '最後の1個の餌で釣った魚の売値が2.5倍', effect: { type: 'last_cast', value: 2.5 }, price: 0, tier: 3, group: 'ローグ', icon: 'hourglass_bottom' },
+    { id: 'last_cast_4', name: '最後の一投 極', description: '最後の1個の餌で釣った魚の売値が3倍', effect: { type: 'last_cast', value: 3 }, price: 0, tier: 4, group: 'ローグ', icon: 'hourglass_bottom' },
+    { id: 'frugal_1', name: '節約家 I', description: '宿に戻ったとき、余った餌のボーナスが1.5倍', effect: { type: 'frugal', value: 1.5 }, price: 0, tier: 1, group: 'ローグ', icon: 'savings' },
+    { id: 'frugal_2', name: '節約家 II', description: '宿に戻ったとき、余った餌のボーナスが2倍', effect: { type: 'frugal', value: 2 }, price: 0, tier: 2, group: 'ローグ', icon: 'savings' },
+    { id: 'frugal_3', name: '節約家 III', description: '宿に戻ったとき、余った餌のボーナスが2.5倍', effect: { type: 'frugal', value: 2.5 }, price: 0, tier: 3, group: 'ローグ', icon: 'savings' },
+    { id: 'chum_master_1', name: '撒き餌名人 I', description: 'まき餌の効果が1投長く続く', effect: { type: 'chum_master', value: 1 }, price: 0, tier: 1, group: 'ローグ', icon: 'grain' },
+    { id: 'chum_master_2', name: '撒き餌名人 II', description: 'まき餌の効果が2投長く続く', effect: { type: 'chum_master', value: 2 }, price: 0, tier: 2, group: 'ローグ', icon: 'grain' },
+    { id: 'combo_keep_1', name: '連鎖の糸 I', description: '逃げられてもコンボが30%残る', effect: { type: 'combo_keep', value: 0.3 }, price: 0, tier: 1, group: 'ローグ', icon: 'link' },
+    { id: 'combo_keep_2', name: '連鎖の糸 II', description: '逃げられてもコンボが50%残る', effect: { type: 'combo_keep', value: 0.5 }, price: 0, tier: 2, group: 'ローグ', icon: 'link' },
+    { id: 'combo_keep_3', name: '連鎖の糸 III', description: '逃げられてもコンボが70%残る', effect: { type: 'combo_keep', value: 0.7 }, price: 0, tier: 3, group: 'ローグ', icon: 'link' },
+    { id: 'greedy_1', name: '欲張り I', description: '評価が銀なら所持金+5%、金なら+10%（上限は目標額の半分）', effect: { type: 'greedy', silver: 0.05, gold: 0.1 }, price: 0, tier: 1, group: 'ローグ', icon: 'savings' },
+    { id: 'greedy_2', name: '欲張り II', description: '評価が銀なら所持金+10%、金なら+20%（上限は目標額の半分）', effect: { type: 'greedy', silver: 0.1, gold: 0.2 }, price: 0, tier: 2, group: 'ローグ', icon: 'savings' },
+    { id: 'greedy_3', name: '欲張り III', description: '評価が銀なら所持金+15%、金なら+30%（上限は目標額の半分）', effect: { type: 'greedy', silver: 0.15, gold: 0.3 }, price: 0, tier: 3, group: 'ローグ', icon: 'savings' },
+    { id: 'last_stand_1', name: '背水 I', description: '目標に届いていない状態で餌が残り3個以下のとき、パワー+20%', effect: { type: 'last_stand', value: 0.2 }, price: 0, tier: 1, group: 'ローグ', icon: 'bolt' },
+    { id: 'last_stand_2', name: '背水 II', description: '目標に届いていない状態で餌が残り3個以下のとき、パワー+35%', effect: { type: 'last_stand', value: 0.35 }, price: 0, tier: 2, group: 'ローグ', icon: 'bolt' },
+    { id: 'last_stand_3', name: '背水 III', description: '目標に届いていない状態で餌が残り3個以下のとき、パワー+50%', effect: { type: 'last_stand', value: 0.5 }, price: 0, tier: 3, group: 'ローグ', icon: 'bolt' },
+    { id: 'local_knowledge_1', name: '土地勘 I', description: 'その釣り場でよく釣れる魚の売値+10%', effect: { type: 'local_knowledge', value: 0.1 }, price: 0, tier: 1, group: 'ローグ', icon: 'map' },
+    { id: 'local_knowledge_2', name: '土地勘 II', description: 'その釣り場でよく釣れる魚の売値+20%', effect: { type: 'local_knowledge', value: 0.2 }, price: 0, tier: 2, group: 'ローグ', icon: 'map' },
+    { id: 'local_knowledge_3', name: '土地勘 III', description: 'その釣り場でよく釣れる魚の売値+30%', effect: { type: 'local_knowledge', value: 0.3 }, price: 0, tier: 3, group: 'ローグ', icon: 'map' },
+    { id: 'speculator_1', name: '相場師 I', description: '本日の高値の魚の売値倍率+0.3（2倍→2.3倍）', effect: { type: 'speculator', value: 0.3 }, price: 0, tier: 1, group: 'ローグ', icon: 'trending_up' },
+    { id: 'speculator_2', name: '相場師 II', description: '本日の高値の魚の売値倍率+0.6（2倍→2.6倍）', effect: { type: 'speculator', value: 0.6 }, price: 0, tier: 2, group: 'ローグ', icon: 'trending_up' },
+    { id: 'speculator_3', name: '相場師 III', description: '本日の高値の魚の売値倍率+1.0（2倍→3倍）', effect: { type: 'speculator', value: 1.0 }, price: 0, tier: 3, group: 'ローグ', icon: 'trending_up' },
+    { id: 'storm_veteran_1', name: '荒天慣れ', description: '嵐の日もゲージが速くならない（売値の上がる分は残る）', effect: { type: 'storm_veteran' }, price: 0, tier: 2, group: 'ローグ', icon: 'thunderstorm' },
+    { id: 'nushi_hunter_1', name: 'ヌシ狩り', description: 'ヌシが4投目からかかり、ヌシ戦の連戦が1つ減る', effect: { type: 'nushi_hunter' }, price: 0, tier: 3, group: 'ローグ', icon: 'emoji_events' },
+    { id: 'regular_customer_1', name: '常連客', description: '釣り宿のスキルの棚が1枚増える', effect: { type: 'regular_customer', value: 1 }, price: 0, tier: 2, group: 'ローグ', icon: 'storefront' },
+    { id: 'connoisseur_1', name: '目利き', description: '報酬スキルの1枚が、いちばん多く集めている系統のものになる', effect: { type: 'connoisseur' }, price: 0, tier: 0, group: 'ローグ', icon: 'visibility' },
+    { id: 'fever_combo_1', name: '星の連なり', description: 'フィーバー中に釣ると、コンボが1つ余分に進む', effect: { type: 'fever_combo', value: 1 }, price: 0, tier: 3, group: 'ローグ', icon: 'auto_awesome' },
+    { id: 'treasure_momentum_1', name: '宝の勢い I', description: '宝箱を開けると、次の一投の売値+25%', effect: { type: 'treasure_momentum', value: 0.25 }, price: 0, tier: 1, group: 'ローグ', icon: 'card_giftcard' },
+    { id: 'treasure_momentum_2', name: '宝の勢い II', description: '宝箱を開けると、次の一投の売値+50%', effect: { type: 'treasure_momentum', value: 0.5 }, price: 0, tier: 2, group: 'ローグ', icon: 'card_giftcard' },
+    { id: 'treasure_momentum_3', name: '宝の勢い III', description: '宝箱を開けると、次の一投の売値+75%', effect: { type: 'treasure_momentum', value: 0.75 }, price: 0, tier: 3, group: 'ローグ', icon: 'card_giftcard' },
+];
+ROGUE_SKILLS.forEach(s => SKILLS.push(s));
 
 // 調整したスキルを上書きする
 Object.entries(ROGUE_CONFIG.skillOverrides).forEach(([id, patch]) => {
