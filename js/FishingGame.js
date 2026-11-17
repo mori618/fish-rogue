@@ -105,6 +105,12 @@ const FishingGame = {
             // ... (既存の宝箱処理と同じ)
             const weights = { ...GAME_DATA.TREASURE_CONFIG.rarityWeights };
 
+            // 宝箱の質（ラグジュアリーハンター・太陽フィーバー）は、銀と金の宝箱の出やすさに効く
+            let quality = GameState.getTreasureQualityMultiplier();
+            if (GameState.fever.isActive && GameState.fever.type === 'sun') quality *= 2.0;
+            weights.SILVER *= quality;
+            weights.GOLD *= quality;
+
             // マグネットスキル判定 (木の宝箱を除外)
             if (GameState.getEffectsByType('magnet').length > 0) {
                 weights.WOOD = 0;
@@ -1176,12 +1182,12 @@ const FishingGame = {
         // 永遠の熱狂 (Eternal Fever) 報酬倍率
         const feverMult = GameState.getFeverRewardMultiplier();
 
-        // 1. お金 (量と質の両方が乗る)
+        // 1. お金（量だけが乗る。質は宝箱の種類の出やすさと、中身のスキル・餌に効く）
         // お金はラウンドの目標額に比例させる（序盤に1個で目標達成、終盤に誤差、を防ぐ）
         const [minRate, maxRate] = GAME_DATA.ROGUE_CONFIG.treasureMoneyRate[type];
         const target = GameState.run ? GameState.run.target : 100;
         const baseMoney = Math.floor(target * (minRate + Math.random() * (maxRate - minRate)));
-        let finalMoney = Math.floor(baseMoney * quantityMult * qualityMult * feverMult);
+        let finalMoney = Math.floor(baseMoney * quantityMult * feverMult);
         // 宝探し4つ: 宝箱のお金が2倍
         GameState.getEffectsByType('family_treasure_money').forEach(e => { finalMoney *= e.value; });
 

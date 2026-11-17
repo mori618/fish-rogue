@@ -1076,7 +1076,17 @@ const ROGUE_CONFIG = {
         triple_catcher_2: { description: '8%の確率で魚が3匹釣れる', effect: { type: 'multi_catch_3', value: 0.08 } },
         triple_catcher_3: { description: '12%の確率で魚が3匹釣れる', effect: { type: 'multi_catch_3', value: 0.12 } },
         triple_catcher_4: { description: '20%の確率で魚が3匹釣れる', effect: { type: 'multi_catch_3', value: 0.2 } },
-        price_up_4: { description: '魚の売却価格+50%', effect: { type: 'price_boost', value: 0.5 } }
+        price_up_4: { description: '魚の売却価格+50%', effect: { type: 'price_boost', value: 0.5 } },
+        // キャッチ率UP: 極で緑ゾーン100%・白ゾーン6〜7割になり赤を狙う意味が消えていたので、最大+30%に
+        catch_rate_2: { description: '捕獲確率+10%', effect: { type: 'catch_boost', value: 0.1 } },
+        catch_rate_3: { description: '捕獲確率+20%', effect: { type: 'catch_boost', value: 0.2 } },
+        catch_rate_4: { description: '捕獲確率+30%', effect: { type: 'catch_boost', value: 0.3 } },
+        // 早打ち: 餌の数で区切るローグライト版では待ち時間短縮に価値がないので、
+        // 「売値が下がる代わりにパワーが上がる」取引にする（待ち時間短縮も残す）
+        quick_hit_penalty_1: { description: 'パワー+10% & 売却価格-10%（待ち時間-15%）', effect: { type: 'quick_hit_penalty', waitReduc: 0.15, priceReduc: 0.1, power: 0.1 } },
+        quick_hit_penalty_2: { description: 'パワー+20% & 売却価格-20%（待ち時間-30%）', effect: { type: 'quick_hit_penalty', waitReduc: 0.3, priceReduc: 0.2, power: 0.2 } },
+        quick_hit_penalty_3: { description: 'パワー+30% & 売却価格-30%（待ち時間-50%）', effect: { type: 'quick_hit_penalty', waitReduc: 0.5, priceReduc: 0.3, power: 0.3 } },
+        quick_hit_penalty_4: { description: 'パワー+40% & 売却価格-40%（待ち時間-75%）', effect: { type: 'quick_hit_penalty', waitReduc: 0.75, priceReduc: 0.4, power: 0.4 } }
     },
 
     // --- 港で買える餌（1回の寄港ごとの在庫つき） ---
@@ -1185,7 +1195,7 @@ const ROGUE_CONFIG = {
     families: [
         {
             id: 'might', name: '剛腕', icon: 'fitness_center', rodType: 'strong',
-            types: ['power_boost', 'overdrive', 'big_game_boost', 'count_skill_power'],
+            types: ['power_boost', 'overdrive', 'big_game_boost', 'count_skill_power', 'quick_hit_penalty'],
             bonus2: { text: 'パワー+15%', effects: [{ type: 'overdrive', power: 0.15, speed: 0 }] },
             bonus4: { text: 'パワーが魚の1.5倍以上なら必ず2匹', effects: [{ type: 'family_overpower_double', ratio: 1.5 }] }
         },
@@ -1215,7 +1225,7 @@ const ROGUE_CONFIG = {
         },
         {
             id: 'school', name: '群れ', icon: 'waves', rodType: 'quick',
-            types: ['multi_catch_2', 'multi_catch_3', 'bait_save', 'rare_boost', 'rank_collector', 'wait_time_reduction', 'quick_hit_penalty', 'catch_boost'],
+            types: ['multi_catch_2', 'multi_catch_3', 'bait_save', 'rare_boost', 'rank_collector', 'wait_time_reduction', 'catch_boost'],
             bonus2: { text: '2匹釣りの確率+10%', effects: [{ type: 'multi_catch_2', value: 0.1 }] },
             bonus4: { text: 'コンボの上限+5（最大+100%）', effects: [{ type: 'family_combo_stacks', value: 5 }] }
         }
