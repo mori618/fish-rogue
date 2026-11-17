@@ -315,7 +315,8 @@ const FishingGame = {
             if (rareBonus > 0 && f.weight < 15) {
                 // ボーナスを適用 (効果を実感しやすくするため係数を2.0とする)
                 // 例: bonus 0.2 (+20%) -> weight * 1.4 
-                effectiveWeight = f.weight * (1 + rareBonus * 2.0);
+                // 釣り場の倍率を消さないよう、上書きではなく掛け算にする
+                effectiveWeight *= 1 + rareBonus * 2.0;
             }
 
             // 未登録魚ボーナス (New Fish Finder)
@@ -849,6 +850,7 @@ const FishingGame = {
         else if (rankDiff >= 3) base = 0.4;
         const powerPenalty = Math.max(0, fish.power - power) / Math.max(1, power) * 0.5;
         let red = Math.max(base - powerPenalty, GAME_DATA.ROGUE_CONFIG.redZoneFloor);
+        red = Math.max(red, GameState.getPerfectCatchRate());
         if (GameState.hasPerfectMaster && GameState.hasPerfectMaster()) red = 1.0;
 
         const isSS = fish.rarity === 'SS';  // SSは赤ゾーン以外では釣れない
@@ -1312,14 +1314,14 @@ const FishingGame = {
                 'nibble_fix_2',
                 'nibble_fix_3',
                 'nibble_fix_4',
-                'sun_blessing_1',
-                'sun_blessing_2',
-                'sun_blessing_3',
-                'sun_blessing_4',
-                'moon_blessing_1',
-                'moon_blessing_2',
-                'moon_blessing_3',
-                'moon_blessing_4',
+                'fever_bias_sun_1',
+                'fever_bias_sun_2',
+                'fever_bias_sun_3',
+                'fever_bias_sun_4',
+                'fever_bias_moon_1',
+                'fever_bias_moon_2',
+                'fever_bias_moon_3',
+                'fever_bias_moon_4',
                 'perfect_master_1',
                 'perfect_master_2',
                 'perfect_master_3',

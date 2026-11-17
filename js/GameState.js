@@ -635,7 +635,8 @@ const GameState = {
     // ========================================
     getFeverChargeBonus() {
         let bonus = 0;
-        this.getEffectsByType('fever_charge_boost').forEach(eff => bonus += eff.value);
+        // 情熱（スキルの効果名は fever_charge）
+        this.getEffectsByType('fever_charge').forEach(eff => bonus += eff.value);
         // 永遠の熱狂 (Eternal Fever) - 蓄積
         this.getEffectsByType('eternal_fever').forEach(eff => bonus += eff.charge);
         return bonus;
@@ -653,7 +654,9 @@ const GameState = {
         this.getEffectsByType('moon_rare_up').forEach(effect => {
             if (this.hasMoonBlessing()) { // Helperを使用
                 const cosmicMult = this.getCosmicBlessingMultiplier();
-                bonus += effect.value * cosmicMult;
+                // 極は「レア魚出現率が2倍」= +100%
+                const add = effect.multiplier ? effect.value - 1 : effect.value;
+                bonus += add * cosmicMult;
             }
         });
 
@@ -729,7 +732,8 @@ const GameState = {
     // ========================================
     getFeverLongBonus() {
         let reduction = 0;
-        this.getEffectsByType('fever_long_boost').forEach(eff => reduction += eff.value);
+        // 熱狂（スキルの効果名は fever_long）
+        this.getEffectsByType('fever_long').forEach(eff => reduction += eff.value);
         // 永遠の熱狂 (Eternal Fever) - 継続
         this.getEffectsByType('eternal_fever').forEach(eff => reduction += eff.sustain);
         return Math.min(reduction, 1.0);
@@ -742,6 +746,10 @@ const GameState = {
         let bonus = 0;
         this.getEffectsByType('red_zone_boost').forEach(effect => {
             bonus += effect.value;
+        });
+        // 達人の針 極: 赤ゾーンの幅も広がる
+        this.getEffectsByType('perfect_catch').forEach(effect => {
+            bonus += effect.extraRedZone || 0;
         });
         // Master Angler - 赤ゾーン
         this.getEffectsByType('master_angler').forEach(effect => {
@@ -887,7 +895,11 @@ const GameState = {
         this.getEffectsByType('sun_chest_up').forEach(effect => {
             if (this.hasSunBlessing()) { // Helperを使用
                 const cosmicMult = this.getCosmicBlessingMultiplier();
-                bonus += effect.value * cosmicMult;
+                // 極は「出現率が3倍」: 基本の出現率に (倍率 − 1) を掛けた分を足す
+                const add = effect.multiplier
+                    ? GAME_DATA.TREASURE_CONFIG.baseChance * (effect.value - 1)
+                    : effect.value;
+                bonus += add * cosmicMult;
             }
         });
         return bonus;
@@ -937,9 +949,8 @@ const GameState = {
     // ========================================
     getFeverBiasBonus(type) {
         let bonus = 0;
-        this.getEffectsByType('fever_bias').forEach(eff => {
-            if (eff.feverType === type) bonus += eff.value;
-        });
+        // 太陽の加護（fever_bias_sun）/ 月の加護（fever_bias_moon）
+        this.getEffectsByType(`fever_bias_${type}`).forEach(eff => { bonus += eff.value; });
         return bonus;
     },
 
@@ -947,11 +958,11 @@ const GameState = {
     // 加護（Blessing）ヘルパー
     // ========================================
     hasSunBlessing() {
-        return this.getEffectsByType('sun_blessing').length > 0 ||
+        return this.getEffectsByType('fever_bias_sun').length > 0 ||
             this.getEffectsByType('cosmic_blessing').length > 0;
     },
     hasMoonBlessing() {
-        return this.getEffectsByType('moon_blessing').length > 0 ||
+        return this.getEffectsByType('fever_bias_moon').length > 0 ||
             this.getEffectsByType('cosmic_blessing').length > 0;
     },
     getCosmicBlessingMultiplier() {
@@ -1202,6 +1213,13 @@ const GameState = {
         return this.getEffectsByType('master_needle').length > 0;
     },
 
+    // 達人の針 I〜極: 赤ゾーンで止めたときの捕獲率の下限（持っていなければ 0）
+    getPerfectCatchRate() {
+        let rate = 0;
+        this.getEffectsByType('perfect_catch').forEach(effect => { rate = Math.max(rate, effect.value); });
+        return rate;
+    },
+
     // ========================================
     // フィーバーの進行
     // ========================================
@@ -1254,8 +1272,8 @@ const GameState = {
         // ゲージ蓄積中の処理 (〜Lv6)
         // ========================================
         else {
-            const chargeChance = this.getFeverChargeBaseChance();
-            const chargeBonus = 0; // 必要なら getFeverChargeBonus をここで使う
+            // 情熱: 溜まる確率を (1 + ボーナス) 倍にする
+            const chargeChance = Math.min(1, this.getFeverChargeBaseChance() * (1 + this.getFeverChargeBonus()));
 
             if (isGuaranteed || Math.random() < chargeChance) {
                 this.fever.value++;
@@ -1263,7 +1281,8 @@ const GameState = {
                 if (this.fever.value >= 1 && !this.fever.type) {
                     const sunBonus = this.getFeverBiasBonus('sun');
                     const moonBonus = this.getFeverBiasBonus('moon');
-                    const sunChance = 0.5 + sunBonus - moonBonus;
+                    // 加護を極めても、もう一方が1割は出るようにする
+                    const sunChance = Math.min(0.9, Math.max(0.1, 0.5 + sunBonus - moonBonus));
                     this.fever.type = Math.random() < sunChance ? 'sun' : 'moon';
                 }
 
