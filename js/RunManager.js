@@ -208,7 +208,15 @@ const RunManager = {
     shouldHookNushi() {
         const run = this.run;
         if (!run || !run.nushi || run.nushi.caught) return false;
-        return (run.roundCasts || 0) + 1 >= this.config.nushi.fromCast;
+        // ヌシ狩り: 4投目からかかる
+        const fromCast = GameState.getEffectsByType('nushi_hunter').length > 0 ? 4 : this.config.nushi.fromCast;
+        return (run.roundCasts || 0) + 1 >= fromCast;
+    },
+
+    // ヌシ戦の連戦数（ヌシ狩りで1つ減る）
+    getNushiPhases() {
+        const fewer = GameState.getEffectsByType('nushi_hunter').length > 0 ? 1 : 0;
+        return Math.max(1, this.config.nushi.phases - fewer);
     },
 
     makeNushiFish() {
@@ -343,7 +351,9 @@ const RunManager = {
         // 余った支給餌はボーナスに換金（買った餌は持ち越す）。支給分から先に使った扱いにする
         const carried = run.supply.carried || 0;
         const leftover = Math.max(0, Math.min(run.supply.count, GameState.getBaitCount(run.supply.id) - carried));
-        const leftoverBonus = leftover * cfg.leftoverBaitBonus * run.round;
+        // 節約家: 余った餌のボーナスが増える
+        const frugal = GameState.getEffectsByType('frugal').reduce((m, e) => Math.max(m, e.value), 1);
+        const leftoverBonus = Math.floor(leftover * cfg.leftoverBaitBonus * run.round * frugal);
         GameState.baitInventory[run.supply.id] -= leftover;
         const clearBonus = Math.floor(run.target * cfg.clearBonusRate);
 
@@ -351,6 +361,14 @@ const RunManager = {
         run.phase = 'harbor';
         GameState.addMoney(clearBonus + leftoverBonus);
         run.lastGrade = grade.id;
+
+        // 欲張り: 評価が銀・金なら所持金が増える（上限はそのラウンドの目標額の半分）
+        let greedBonus = 0;
+        if (grade.id === 'silver' || grade.id === 'gold') {
+            const rate = GameState.getEffectsByType('greedy').reduce((m, e) => Math.max(m, e[grade.id] || 0), 0);
+            greedBonus = Math.min(Math.floor(run.target * 0.5), Math.floor(GameState.money * rate));
+            if (greedBonus > 0) GameState.addMoney(greedBonus);
+        }
 
         const isFinalClear = run.round === cfg.finalRound;
         SaveManager.recordRun(run.round, false, isFinalClear);
@@ -361,7 +379,7 @@ const RunManager = {
         // 商売4つ: 入れ替えが毎回1回無料
         const familyRerolls = GameState.getEffectsByType('family_free_reroll').reduce((a, e) => a + e.value, 0);
         run.harbor = {
-            summary: { earned: run.earned, target: run.target, grade: grade.id, clearBonus, leftover, leftoverBonus, isFinalClear },
+            summary: { earned: run.earned, target: run.target, grade: grade.id, clearBonus, leftover, leftoverBonus, greedBonus, isFinalClear },
             rewardTaken: false,
             rewardOptions: this.pickSkills(rewardCount, run.round + 1, [], grade.tierUp),
             shopSkills: [],
@@ -376,6 +394,7 @@ const RunManager = {
             // 次の素材の竿（最上位の竿なら並ばない）
             rodOffers: GAME_DATA.RODS[GameState.rodRankIndex + 1] ? this.pickRodTypes(cfg.rodOfferChoices) : []
         };
+        this.applyConnoisseur(run.harbor.rewardOptions);
         this.restockSkills();
         cfg.baitShop.forEach(item => {
             if (item.fromRound <= run.round + 1) run.harbor.baitStock[item.id] = Math.max(1, item.stock + rules.stockDelta);
@@ -405,6 +424,10 @@ const RunManager = {
         this.run.roundCasts = (this.run.roundCasts || 0) + 1;
         stats.catches++;
         this.run.combo++;
+        // 星の連なり: フィーバー中はコンボが余分に進む
+        if (GameState.fever.isActive) {
+            GameState.getEffectsByType('fever_combo').forEach(e => { this.run.combo += e.value; });
+        }
     },
 
     recordEscape(fish) {
@@ -427,7 +450,22 @@ const RunManager = {
 
     breakCombo() {
         UIManager.breakCombo(this.run.combo);
-        this.run.combo = 0;
+        // 連鎖の糸: 逃げられてもコンボが一部残る
+        const keep = GameState.getEffectsByType('combo_keep').reduce((m, e) => Math.max(m, e.value), 0);
+        this.run.combo = Math.floor(this.run.combo * keep);
+    },
+
+    // 目利き: 報酬の1枚を、いちばん多く集めている系統のスキルにする
+    applyConnoisseur(options) {
+        if (!options.length || GameState.getEffectsByType('connoisseur').length === 0) return;
+        const counts = GameState.getFamilyCounts();
+        const best = this.config.families.filter(f => counts[f.id] > 0).sort((a, b) => counts[b.id] - counts[a.id])[0];
+        if (!best) return;
+        if (options.some(id => { const f = GameState.getSkillFamily(id); return f && f.id === best.id; })) return;
+        const tier = GameState.getSkillData(options[0]).tier;
+        const pool = GAME_DATA.SKILLS.filter(s => s.tier === tier && this.isOfferable(s) && !options.includes(s.id) &&
+            (GameState.getSkillFamily(s.id) || {}).id === best.id);
+        if (pool.length) options[0] = pool[Math.floor(Math.random() * pool.length)].id;
     },
     gameOver() {
         const run = this.run;
@@ -581,7 +619,9 @@ const RunManager = {
 
     restockSkills() {
         const harbor = this.run.harbor;
-        const ids = this.pickSkills(this.config.shopSkillCount, this.run.round + 1, harbor.rewardOptions);
+        // 常連客: 棚が増える
+        const extra = GameState.getEffectsByType('regular_customer').reduce((a, e) => a + e.value, 0);
+        const ids = this.pickSkills(this.config.shopSkillCount + extra, this.run.round + 1, harbor.rewardOptions);
         harbor.shopSkills = ids.map(id => ({ id, sold: false }));
     },
 

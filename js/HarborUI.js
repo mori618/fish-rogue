@@ -48,7 +48,7 @@ const HarborUI = {
     // ----------------------------------------
     showArrival(summary) {
         const grade = GAME_DATA.ROGUE_CONFIG.grades.find(g => g.id === summary.grade);
-        const total = summary.earned + summary.clearBonus + summary.leftoverBonus;
+        const total = summary.earned + summary.clearBonus + summary.leftoverBonus + (summary.greedBonus || 0);
         const overlay = document.createElement('div');
         overlay.className = `rg-arrival rg-grade-${grade.id}`;
         overlay.innerHTML = `
@@ -57,6 +57,7 @@ const HarborUI = {
                 <div><span>水揚げ</span><strong data-to="${summary.earned}">0</strong></div>
                 <div><span>クリアボーナス</span><strong data-to="${summary.clearBonus}">0</strong></div>
                 <div><span>余った餌 ×${summary.leftover}</span><strong data-to="${summary.leftoverBonus}">0</strong></div>
+                ${summary.greedBonus ? `<div><span>欲張り</span><strong data-to="${summary.greedBonus}">0</strong></div>` : ''}
                 <div class="rg-arrival-total"><span>合計</span><strong data-to="${total}">0</strong></div>
             </div>
             <div class="rg-arrival-hint">タップで閉じる</div>
@@ -205,7 +206,7 @@ const HarborUI = {
         const banner = summary.isFinalClear
             ? `<div class="rg-banner"><span class="material-icons">emoji_events</span> 釣り旅達成！ ここから先はエンドレスです</div>`
             : '';
-        const total = summary.clearBonus + summary.leftoverBonus;
+        const total = summary.clearBonus + summary.leftoverBonus + (summary.greedBonus || 0);
 
         return `
             ${banner}
