@@ -878,8 +878,12 @@ const UIManager = {
 
         // 水の色と岸辺の景色は水域ごとに変える（池の緑、川の青、沿岸、外洋の紺）
         const region = GameState.getCurrentRegion();
-        const water = region ? region.water : ['#3b82f6', '#1e3a8a'];
+        const spot = GameState.getCurrentSpot();
+        const water = (spot && spot.water) || (region ? region.water : ['#3b82f6', '#1e3a8a']);
         fishingScreen.dataset.region = region ? region.id : '';
+        fishingScreen.dataset.spot = spot ? spot.id : '';
+        // 岸辺の景色と水面の飾りは釣り場ごとに描き分ける
+        if (typeof Scenery !== 'undefined') Scenery.apply(spot ? spot.id : null);
 
         const newGradient = `linear-gradient(180deg, ${skyTop} 0%, ${skyBottom} 29.5%, ${water[0]} 30%, ${water[1]} 100%)`;
 
@@ -1036,9 +1040,6 @@ const UIManager = {
             <circle cx="60" cy="60" r="56" fill="url(#rg-moon-glow)"/>
             <g mask="url(#rg-moon-mask)">
                 <circle cx="60" cy="60" r="32" fill="url(#rg-moon-body)"/>
-                <circle cx="44" cy="70" r="5" fill="#d97706" opacity="0.35"/>
-                <circle cx="52" cy="84" r="3" fill="#d97706" opacity="0.35"/>
-                <circle cx="36" cy="54" r="3.5" fill="#d97706" opacity="0.3"/>
             </g>
         </svg>`,
         boat: `<svg class="rg-boat" viewBox="0 0 120 70" aria-hidden="true">

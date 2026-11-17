@@ -1178,7 +1178,7 @@ const ROGUE_CONFIG = {
     // --- 水域と釣り場（水域はラウンドで決まり、釣り宿でその水域の釣り場を1つ選ぶ） ---
     //   fish: その釣り場でよく釣れる魚（同じランクの中で出やすさが favoredWeight 倍）
     //   rankBoost: ランクの出やすさの上乗せ（海溝の深海魚など）
-    //   water: 釣り画面の水の色（水面, 水底）
+    //   water: 釣り画面の水の色（水面, 水底）。釣り場にあればそちらを使う。岸辺の景色は js/Scenery.js
     // --- スキルの系統（設計書5.5）。同じ系統を2つ・4つ装備するとボーナス ---
     // types: その系統に入る効果の種類。rodType: その竿を持っていると1つ分に数える
     // bonus2 / bonus4 の effects は「見えないスキル」として混ぜる
@@ -1265,33 +1265,33 @@ const ROGUE_CONFIG = {
         {
             id: 'village', name: '里の水辺', from: 1, water: ['#4f9d7e', '#1f4d3c'],
             spots: [
-                { id: 'paddy', name: '田んぼ', fish: ['fish_d9', 'fish_d8', 'fish_d5'] },
-                { id: 'brook', name: '小川', fish: ['fish_d1', 'fish_d3', 'fish_d7'] },
-                { id: 'pond', name: 'ため池', fish: ['fish_d2', 'fish_d4', 'fish_d6'] }
+                { id: 'paddy', water: ['#7f9f58', '#3a5329'], name: '田んぼ', fish: ['fish_d9', 'fish_d8', 'fish_d5'] },
+                { id: 'brook', water: ['#5fb3c9', '#1f5f74'], name: '小川', fish: ['fish_d1', 'fish_d3', 'fish_d7'] },
+                { id: 'pond', water: ['#3f7f5e', '#163728'], name: 'ため池', fish: ['fish_d2', 'fish_d4', 'fish_d6'] }
             ]
         },
         {
             id: 'river', name: '川と湖', from: 4, water: ['#3d8fc4', '#1b4a72'],
             spots: [
-                { id: 'stream', name: '渓流', fish: ['fish_c2', 'fish_c3', 'fish_c1'] },
-                { id: 'lake', name: '湖', fish: ['fish_c6', 'fish_c7', 'fish_c4'] },
-                { id: 'midstream', name: '中流', fish: ['fish_c8', 'fish_c5'] }
+                { id: 'stream', water: ['#3fb8b0', '#0f4e54'], name: '渓流', fish: ['fish_c2', 'fish_c3', 'fish_c1'] },
+                { id: 'lake', water: ['#4a8fd0', '#173f6e'], name: '湖', fish: ['fish_c6', 'fish_c7', 'fish_c4'] },
+                { id: 'midstream', water: ['#5b8fa8', '#22465a'], name: '中流', fish: ['fish_c8', 'fish_c5'] }
             ]
         },
         {
             id: 'coast', name: '沿岸', from: 7, water: ['#3b82f6', '#1e3a8a'],
             spots: [
-                { id: 'pier', name: '堤防', fish: ['fish_b7', 'fish_b4', 'fish_b5'] },
-                { id: 'rocks', name: '磯', fish: ['fish_b1', 'fish_b2'] },
-                { id: 'rip', name: '潮目', fish: ['fish_b6', 'fish_b3'] }
+                { id: 'pier', water: ['#2f80d0', '#123c78'], name: '堤防', fish: ['fish_b7', 'fish_b4', 'fish_b5'] },
+                { id: 'rocks', water: ['#2a76b0', '#0d2f55'], name: '磯', fish: ['fish_b1', 'fish_b2'] },
+                { id: 'rip', water: ['#2f6fe0', '#0d2c6a'], name: '潮目', fish: ['fish_b6', 'fish_b3'] }
             ]
         },
         {
             id: 'ocean', name: '外洋', from: 10, water: ['#2563eb', '#0b1a4a'],
             spots: [
-                { id: 'offshore', name: '沖', fish: ['fish_a1', 'fish_a2', 'fish_a5'] },
-                { id: 'deep', name: '深場', fish: ['fish_a4', 'fish_a3', 'fish_a6'] },
-                { id: 'trench', name: '海溝', fish: ['fish_s3', 'fish_s1', 'fish_s2'], rankBoost: { S: 0.05 } }
+                { id: 'offshore', water: ['#1f5fc4', '#0a2453'], name: '沖', fish: ['fish_a1', 'fish_a2', 'fish_a5'] },
+                { id: 'deep', water: ['#15449a', '#051236'], name: '深場', fish: ['fish_a4', 'fish_a3', 'fish_a6'] },
+                { id: 'trench', water: ['#0e2a63', '#010614'], name: '海溝', fish: ['fish_s3', 'fish_s1', 'fish_s2'], rankBoost: { S: 0.05 } }
             ]
         }
     ]
