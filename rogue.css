@@ -2104,3 +2104,94 @@ body[data-screen="harbor"] .rg-tip {
     min-height: 44px;
     font-size: var(--fs-sm);
 }
+
+/* ========================================
+   空と水面の演出（太陽・月・漁船・カモメ）
+   ======================================== */
+
+/* 太陽と月は、岸辺の山（.rg-shore, z-index 2）より後ろから昇る */
+.fever-container {
+    z-index: 1;
+}
+
+.fever-sky-area {
+    height: 30%;   /* 水平線まで。ここから下にはみ出た部分は見えない */
+}
+
+.celestial-body {
+    width: 110px;
+    height: 110px;
+}
+
+.celestial-body svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.rg-sun-rays {
+    transform-origin: 60px 60px;
+    animation: rg-sun-spin 24s linear infinite;
+}
+
+@keyframes rg-sun-spin {
+    to { transform: rotate(360deg); }
+}
+
+.fever-container.fever-active .rg-sun-core {
+    fill: url(#rg-sun-hot);
+}
+
+.fever-container.fever-active .rg-sun-rays {
+    fill: #f97316;
+    animation-duration: 8s;
+}
+
+/* 発動中の脈動（元の translateX のずれをなくす） */
+.fever-container.fever-active .sun,
+.fever-container.fever-active .moon {
+    animation: rg-celestial-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes rg-celestial-pulse {
+    from { transform: scale(1.1); filter: drop-shadow(0 0 12px rgba(253, 230, 138, 0.8)); }
+    to { transform: scale(1.25); filter: drop-shadow(0 0 30px rgba(253, 186, 116, 0.9)); }
+}
+
+/* 漁船: 水平線の少し下を横切る */
+.event-boat {
+    top: calc(30% - 22px);
+    width: 96px;
+    font-size: 0;
+    filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.25));
+}
+
+.rg-boat {
+    display: block;
+    width: 100%;
+    height: auto;
+    animation: boat-floating 3.5s ease-in-out infinite;
+}
+
+/* カモメ: 羽ばたきながら空を渡る */
+.event-bird {
+    width: 36px;
+    font-size: 0;
+}
+
+.rg-gull {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.rg-gull-wings {
+    transform-origin: 20px 9px;
+    animation: rg-gull-flap 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes rg-gull-flap {
+    from { transform: scaleY(1); }
+    to { transform: scaleY(-0.35); }
+}
