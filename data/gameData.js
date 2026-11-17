@@ -1056,7 +1056,9 @@ const ROGUE_CONFIG = {
         'ship_interval_down', 'ship_amount_up', 'ship_fuel_eco', 'ship_fuel_discount',
         'stoic', 'xp_boost', 'rank_power_boost', 'rank_reward_boost', 'log_coin_boost',
         'mission_reward_up', 'gacha_mission_boost', 'recycle_boost',
-        'count_fish_gacha', 'count_gacha_coin', 'count_fish_title', 'count_gacha_sell'
+        'count_fish_gacha', 'count_gacha_coin', 'count_fish_title', 'count_gacha_sell',
+        // 忍耐力: 餌の数で区切るローグライト版では待ち時間を縮めても稼ぎが変わらないので出さない
+        'wait_time_reduction'
     ],
 
     // 予算（設計書 6.7）を超えるスキルの調整。読み込み時に SKILLS へ上書きする
@@ -1083,6 +1085,10 @@ const ROGUE_CONFIG = {
         catch_rate_4: { description: '捕獲確率+30%', effect: { type: 'catch_boost', value: 0.3 } },
         // 早打ち: 餌の数で区切るローグライト版では待ち時間短縮に価値がないので、
         // 「売値が下がる代わりにパワーが上がる」取引にする（待ち時間短縮も残す）
+        // 船乗りの勘: I〜III の上がり幅が小さく実感できなかったので引き上げる（極は+30%のまま）
+        sailor_intuition_1: { description: 'ボートイベント出現率 +10%', effect: { type: 'boat_event_boost', value: 0.1 } },
+        sailor_intuition_2: { description: 'ボートイベント出現率 +15%', effect: { type: 'boat_event_boost', value: 0.15 } },
+        sailor_intuition_3: { description: 'ボートイベント出現率 +20%', effect: { type: 'boat_event_boost', value: 0.2 } },
         quick_hit_penalty_1: { description: 'パワー+10% & 売却価格-10%（待ち時間-15%）', effect: { type: 'quick_hit_penalty', waitReduc: 0.15, priceReduc: 0.1, power: 0.1 } },
         quick_hit_penalty_2: { description: 'パワー+20% & 売却価格-20%（待ち時間-30%）', effect: { type: 'quick_hit_penalty', waitReduc: 0.3, priceReduc: 0.2, power: 0.2 } },
         quick_hit_penalty_3: { description: 'パワー+30% & 売却価格-30%（待ち時間-50%）', effect: { type: 'quick_hit_penalty', waitReduc: 0.5, priceReduc: 0.3, power: 0.3 } },
@@ -1213,13 +1219,13 @@ const ROGUE_CONFIG = {
         },
         {
             id: 'treasure', name: '宝探し', icon: 'card_giftcard', rodType: 'probe',
-            types: ['treasure_boost', 'treasure_quantity', 'treasure_quality', 'magnet', 'title_boost', 'boat_event_boost', 'bird_event_boost'],
+            types: ['treasure_boost', 'treasure_quantity', 'treasure_quality', 'magnet', 'title_boost', 'bird_event_boost'],
             bonus2: { text: '宝箱の出現率+5%', effects: [{ type: 'treasure_boost', value: 0.05 }] },
             bonus4: { text: '宝箱のお金が2倍', effects: [{ type: 'family_treasure_money', value: 2 }] }
         },
         {
             id: 'sky', name: '天体', icon: 'auto_awesome', rodType: null,
-            types: ['fever_charge', 'fever_long', 'fever_bias_sun', 'fever_bias_moon', 'moon_rare_up', 'sun_chest_up', 'fever_treasure_boost', 'eternal_mania', 'cosmic_blessing'],
+            types: ['fever_charge', 'fever_long', 'fever_bias_sun', 'fever_bias_moon', 'moon_rare_up', 'sun_chest_up', 'fever_treasure_boost', 'eternal_mania', 'cosmic_blessing', 'boat_event_boost'],
             bonus2: { text: 'ラウンド開始時にフィーバーゲージ+2', effects: [{ type: 'family_fever_start', value: 2 }] },
             bonus4: { text: 'フィーバー中は餌が減らない', effects: [{ type: 'family_fever_bait_save' }] }
         },
@@ -1270,7 +1276,8 @@ const ROGUE_CONFIG = {
     ],
 
     favoredWeight: 3,
-    highValueMult: 2,               // 「本日の高値」の魚の売値倍率
+    highValueMult: 2,
+    birdPowerRate: 0.8,     // 鳥のイベントで上がった魚は、パワーをこの割合で判定する（上位の魚に届きやすく）               // 「本日の高値」の魚の売値倍率
     regions: [
         {
             id: 'village', name: '里の水辺', from: 1, water: ['#4f9d7e', '#1f4d3c'],
