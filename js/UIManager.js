@@ -992,6 +992,73 @@ const UIManager = {
     },
 
     // ========================================
+    // 空と水面の演出の絵（太陽・月・漁船・カモメ）
+    // ========================================
+    ART: {
+        sun: `<svg class="rg-sun" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+                <radialGradient id="rg-sun-core" cx="45%" cy="40%" r="60%">
+                    <stop offset="0%" stop-color="#fff7cc"/>
+                    <stop offset="55%" stop-color="#fcd34d"/>
+                    <stop offset="100%" stop-color="#f59e0b"/>
+                </radialGradient>
+                <radialGradient id="rg-sun-hot" cx="45%" cy="40%" r="60%">
+                    <stop offset="0%" stop-color="#ffedd5"/>
+                    <stop offset="50%" stop-color="#fb923c"/>
+                    <stop offset="100%" stop-color="#dc2626"/>
+                </radialGradient>
+                <radialGradient id="rg-sun-glow">
+                    <stop offset="40%" stop-color="#fde68a" stop-opacity="0.55"/>
+                    <stop offset="100%" stop-color="#fde68a" stop-opacity="0"/>
+                </radialGradient>
+            </defs>
+            <circle cx="60" cy="60" r="58" fill="url(#rg-sun-glow)"/>
+            <g class="rg-sun-rays" fill="#fbbf24">
+                ${Array.from({ length: 12 }, (_, i) => `<path d="M60 6 L65 22 L55 22 Z" transform="rotate(${i * 30} 60 60)"/>`).join('')}
+            </g>
+            <circle class="rg-sun-core" cx="60" cy="60" r="28" fill="url(#rg-sun-core)"/>
+        </svg>`,
+        moon: `<svg class="rg-moon" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+                <radialGradient id="rg-moon-glow">
+                    <stop offset="35%" stop-color="#fef9c3" stop-opacity="0.5"/>
+                    <stop offset="100%" stop-color="#fef9c3" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="rg-moon-body" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#fef3c7"/>
+                    <stop offset="100%" stop-color="#f59e0b"/>
+                </linearGradient>
+                <mask id="rg-moon-mask">
+                    <rect width="120" height="120" fill="#fff"/>
+                    <circle cx="76" cy="48" r="28" fill="#000"/>
+                </mask>
+            </defs>
+            <circle cx="60" cy="60" r="56" fill="url(#rg-moon-glow)"/>
+            <g mask="url(#rg-moon-mask)">
+                <circle cx="60" cy="60" r="32" fill="url(#rg-moon-body)"/>
+                <circle cx="44" cy="70" r="5" fill="#d97706" opacity="0.35"/>
+                <circle cx="52" cy="84" r="3" fill="#d97706" opacity="0.35"/>
+                <circle cx="36" cy="54" r="3.5" fill="#d97706" opacity="0.3"/>
+            </g>
+        </svg>`,
+        boat: `<svg class="rg-boat" viewBox="0 0 120 70" aria-hidden="true">
+            <path d="M58 6 V44" stroke="#5b4636" stroke-width="2.5"/>
+            <path d="M58 8 L76 13 L58 18 Z" fill="#ef4444"/>
+            <path d="M58 22 L40 40 H58 Z" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+            <rect x="64" y="28" width="22" height="16" rx="2" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1"/>
+            <rect x="68" y="32" width="6" height="5" fill="#60a5fa"/>
+            <rect x="77" y="32" width="6" height="5" fill="#60a5fa"/>
+            <path d="M8 44 H112 L100 60 H22 Z" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+            <path d="M12 49 H108 L106 52 H15 Z" fill="#2563eb"/>
+            <path d="M14 62 Q30 58 46 62 T78 62 T110 62" stroke="#e0f2fe" stroke-width="2" fill="none" opacity="0.8"/>
+        </svg>`,
+        bird: `<svg class="rg-gull" viewBox="0 0 40 16" aria-hidden="true">
+            <path class="rg-gull-wings" d="M1 9 Q10 0 20 9 Q30 0 39 9" stroke="#334155" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="20" cy="9.5" r="1.8" fill="#334155"/>
+        </svg>`
+    },
+
+    // ========================================
     // ボート通過イベント表示
     // ========================================
     showBoatEvent(callback) {
@@ -1009,7 +1076,7 @@ const UIManager = {
         // ボート要素
         const boat = document.createElement('div');
         boat.className = 'event-boat';
-        boat.innerHTML = '<span class="material-icons game-boat">sailing</span>';
+        boat.innerHTML = this.ART.boat;
         container.appendChild(boat);
 
         // クリーンアップ
@@ -1044,7 +1111,7 @@ const UIManager = {
         birdsConfig.forEach((config, index) => {
             const bird = document.createElement('div');
             bird.className = 'event-bird';
-            bird.innerHTML = '<span class="material-icons game-bird">keyboard_arrow_down</span>';
+            bird.innerHTML = this.ART.bird;
 
             // ずらし
             bird.style.animationDelay = `${config.delay}s`;
@@ -1083,12 +1150,8 @@ const UIManager = {
                 container.className = 'fever-container';
                 container.innerHTML = `
                 <div class="fever-sky-area">
-                    <div class="celestial-body sun">
-                        <span class="material-icons">wb_sunny</span>
-                    </div>
-                    <div class="celestial-body moon">
-                        <span class="material-icons">nightlight</span>
-                    </div>
+                    <div class="celestial-body sun">${this.ART.sun}</div>
+                    <div class="celestial-body moon">${this.ART.moon}</div>
                 </div>
             `;
                 // 背景の手前、UIの後ろ
