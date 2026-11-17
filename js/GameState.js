@@ -446,6 +446,11 @@ const GameState = {
             multiplier += effect.power;
         });
 
+        // 早打ち: 売値が下がる代わりにパワーが上がる
+        this.getEffectsByType('quick_hit_penalty').forEach(effect => {
+            multiplier += effect.power || 0;
+        });
+
         const ultimateRiskEffects = this.getEffectsByType('ultimate_risk');
         ultimateRiskEffects.forEach(effect => {
             multiplier += effect.power;
