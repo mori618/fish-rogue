@@ -113,13 +113,22 @@ const GameState = {
     // 釣り中に得たお金はすべてラウンドの水揚げ額にも加算される
     // ========================================
     addMoney(amount) {
-        this.money += amount;
-        if (amount > 0) {
-            this.totalMoneyEarned += amount;
-            if (this.run && this.run.phase === 'fishing') {
-                this.run.earned += amount;
-            }
+        if (amount > 0 && this.run && this.run.phase === 'fishing') {
+            // 水揚げ額（評価に使う）は全額数える。所持金になるのは、目標額を超えた分は一部だけ
+            // （粘って金評価を取る意味は報酬に残しつつ、お金が雪だるま式に増えるのを防ぐ）
+            const run = this.run;
+            const rate = GAME_DATA.ROGUE_CONFIG.overflowMoneyRate;
+            const below = Math.max(0, Math.min(amount, run.target - run.earned));
+            const over = amount - below;
+            const kept = below + Math.floor(over * rate);
+            run.earned += amount;
+            run.overflowCut = (run.overflowCut || 0) + (amount - kept);
+            this.money += kept;
+            this.totalMoneyEarned += kept;
+            return;
         }
+        this.money += amount;
+        if (amount > 0) this.totalMoneyEarned += amount;
     },
 
     spendMoney(amount) {
@@ -496,11 +505,10 @@ const GameState = {
         });
 
         // 特殊スキルの倍率補正
-        const masterAnglerSpecial = this.getEffectsByType('master_angler_special').length > 0;
         const goodFeel = this.getEffectsByType('good_feel').length > 0;
         const hardMode = this.getEffectsByType('hard_mode').length > 0;
 
-        if (masterAnglerSpecial) multiplier *= 2.0;
+        // 太公望は「釣果2倍」のスキルなので、説明にないパワー2倍は外す
         if (goodFeel) multiplier *= 2.0;
         if (hardMode) multiplier *= 5.0;
 
@@ -510,9 +518,7 @@ const GameState = {
         // フィーバーボーナス (月: お魚フィーバー)
         // ========================================
         if (this.fever.isActive && this.fever.type === 'moon') {
-            const feverBonus = 2.0; // 2.0倍 (100% UP)
-            power = Math.floor(power * feverBonus);
-            console.log(`🔥 お魚フィーバー効果: パワー 2.0倍! -> ${power}`);
+            power = Math.floor(power * GAME_DATA.ROGUE_CONFIG.moonFeverPower);
         }
 
         return power;
@@ -528,15 +534,13 @@ const GameState = {
         if (this.skillInventory) {
             totalOwnedSkills = Object.values(this.skillInventory).reduce((sum, count) => sum + count, 0);
         }
+        // 宝箱でスキルが大量に手に入るので、数えるのは上限まで
+        totalOwnedSkills = Math.min(totalOwnedSkills, GAME_DATA.ROGUE_CONFIG.countSkillCap);
 
-        for (const skillId of this.equippedSkills) {
-            const skillData = this.getSkillData(skillId);
-            if (!skillData) continue;
-
-            this.getEffectsByType('count_skill_power').forEach(effect => {
-                bonus += totalOwnedSkills * effect.value;
-            });
-        }
+        // マナの共鳴: 所持スキル数 × 値。原作は装備スキルの数だけ重ねて足していた（12個装備なら12倍）ので1回だけにする
+        this.getEffectsByType('count_skill_power').forEach(effect => {
+            bonus += totalOwnedSkills * effect.value;
+        });
         return Math.floor(bonus);
     },
 
@@ -1255,7 +1259,7 @@ const GameState = {
         return this.getEffectsByType('master_needle').length > 0;
     },
 
-    // 達人の針 I〜極: 赤ゾーンで止めたときの捕獲率の下限（持っていなければ 0）
+    // 達人の針 I〜極: 赤ゾーンで止めたときの捕獲率に足す分（持っていなければ 0）
     getPerfectCatchRate() {
         let rate = 0;
         this.getEffectsByType('perfect_catch').forEach(effect => { rate = Math.max(rate, effect.value); });

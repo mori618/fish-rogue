@@ -50,6 +50,12 @@ const ROD_TYPES = {
     probe: { power: 1.0, red: 0, combo: 0, price: 0.9 + 0.05, cost: 1.0 }  // 宝箱+5%の分を売値+5%で近似
 };
 
+// MEASURE=1 のときは失敗しても続け、ラウンドごとの稼ぎ（餌を使い切った場合）を集める
+const MEASURE = !!process.env.MEASURE;
+const MEASURED = {};
+const MEASURED_P = {};
+const MEASURED_M = {};
+
 const byRank = {};
 G.FISH.forEach(f => (byRank[f.rarity] = byRank[f.rarity] || []).push(f));
 
@@ -66,22 +72,20 @@ const pickWeighted = (items, weightOf) => {
 
 const rankOf = baitId => baitId.slice(-1).toUpperCase();
 
-function redRate(baitRank, fish, power) {
-    const diff = RANK_INDEX[fish.rarity] - RANK_INDEX[baitRank];
-    let base = 0.9;
-    if (diff === 1) base = 0.8;
-    else if (diff === 2) base = 0.6;
-    else if (diff >= 3) base = 0.4;
-    const penalty = Math.max(0, fish.power - power) / Math.max(1, power) * 0.5;
-    return Math.max(base - penalty, CFG.redZoneFloor);
+// ゲーム本体（FishingGame.getZoneRates）と同じ判定: どのゾーンもパワー係数で下がる
+function powerFactor(fish, power) {
+    const ratio = power / Math.max(1, fish.power);
+    return ratio >= 1 ? 1 : Math.pow(ratio, CFG.catchModel.exponent);
 }
 
 function battle(baitRank, fish, power, skill, speedUp = 0) {
     const r = Math.random() * (1 + speedUp);  // ゲージが速いほど赤に止めにくい
-    if (r < skill.red) return Math.random() < redRate(baitRank, fish, power);
+    const f = powerFactor(fish, power);
+    const m = CFG.catchModel;
+    if (r < skill.red) return Math.random() < m.base.red * f;
     if (fish.rarity === 'SS') return false;
-    if (r < skill.red + skill.green) return Math.random() < 0.4 + Math.random() * 0.2;
-    return Math.random() < 0.1 + Math.random() * 0.1;
+    if (r < skill.red + skill.green) return Math.random() < m.base.green * f;
+    return Math.random() < m.base.white * f;
 }
 
 // 1投の結果（釣れたら魚、だめなら null）
@@ -185,7 +189,7 @@ function playRun(skillBase, valueMult, maxRound, rodTypeId = 'all', ascension = 
 
         // 安い餌から使う（ヌシのラウンドは6投目からヌシがかかる）
         for (const rank of RANKS) {
-            while (st.bait[rank] > 0 && (earned < target || !nushiCaught)) {
+            while (st.bait[rank] > 0 && (MEASURE || earned < target || !nushiCaught)) {
                 st.bait[rank]--;
                 casts++;
                 let fish;
@@ -205,11 +209,16 @@ function playRun(skillBase, valueMult, maxRound, rodTypeId = 'all', ascension = 
                 }
             }
         }
-        if (earned < target || !nushiCaught) return round - 1;
+        if (MEASURE) {
+            (MEASURED[round] = MEASURED[round] || []).push(earned);
+            (MEASURED_P[round] = MEASURED_P[round] || []).push(p);
+            (MEASURED_M[round] = MEASURED_M[round] || []).push(st.money);
+        }
+        else if (earned < target || !nushiCaught) return round - 1;
 
         const leftover = Math.min(supplyCount, st.bait[supply]);
         st.bait[supply] -= leftover;
-        st.money += earned + Math.floor(target * CFG.clearBonusRate) + leftover * CFG.leftoverBaitBonus * round;
+        st.money += Math.min(earned, target) + Math.floor(Math.max(0, earned - target) * CFG.overflowMoneyRate) + Math.floor(target * CFG.clearBonusRate) + leftover * CFG.leftoverBaitBonus * round;
 
         // 釣り宿: 所持金の半分までを竿に（パワー効率の良い方を優先）、残りで割の良い餌を買う
         let budget = st.money * 0.5;
@@ -234,7 +243,8 @@ function playRun(skillBase, valueMult, maxRound, rodTypeId = 'all', ascension = 
             .map(b => ({ ...b, value: expectedPerCast(b.rank, p2, skill) * b.quantity * valueMult(round + 1) / b.price }))
             .sort((a, b) => b.value - a.value);
         for (const o of shop) {
-            while (o.left > 0 && o.value > 1.1 && st.money >= o.price) {
+            const carried = () => Object.values(st.bait).reduce((x, y) => x + y, 0);
+            while (o.left > 0 && o.value > 1.1 && st.money >= o.price && carried() + o.quantity <= CFG.baitCarryCap) {
                 st.money -= o.price; st.bait[o.rank] += o.quantity; o.left--;
             }
         }
@@ -257,6 +267,14 @@ function report(title, valueMult, runs, rodTypeId = 'all', ascension = 0) {
     });
 }
 
+if (MEASURE) {
+    const n = Number(process.argv[2]) || 400;
+    for (let i = 0; i < n; i++) playRun(SKILL['標準'], r => 1 + 0.1 * (r - 1), CFG.finalRound, process.argv[3] || 'all');
+    const med = a => a.sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    const q = (a, p) => a.sort((x, y) => x - y)[Math.floor(a.length * p)];
+    Object.keys(MEASURED).forEach(r => console.log(`R${r} 稼ぎ 下位25% ${q(MEASURED[r], 0.25)}  中央 ${med(MEASURED[r])}  上位25% ${q(MEASURED[r], 0.75)}  目標 ${targetFor(Number(r))}  パワー ${med(MEASURED_P[r])}  所持金 ${med(MEASURED_M[r])}`));
+    process.exit(0);
+}
 const runs = Number(process.argv[2]) || 1500;
 const rodArg = process.argv[3] || 'all';
 const ascArg = Number(process.argv[4]) || 0;

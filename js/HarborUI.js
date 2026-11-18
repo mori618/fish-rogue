@@ -7,6 +7,11 @@
 const HarborUI = {
     TIER_LABELS: { 0: '特別', 1: 'I', 2: 'II', 3: 'III', 4: '極' },
 
+    // 札に出す文字（丸に「I」だと情報マークに見えるので「Tier I」にする）
+    tierText(tier) {
+        return tier === 0 ? '特別' : `Tier ${this.TIER_LABELS[tier]}`;
+    },
+
     // ========================================
     // 釣り宿画面
     // ========================================
@@ -48,13 +53,13 @@ const HarborUI = {
     // ----------------------------------------
     showArrival(summary) {
         const grade = GAME_DATA.ROGUE_CONFIG.grades.find(g => g.id === summary.grade);
-        const total = summary.earned + summary.clearBonus + summary.leftoverBonus + (summary.greedBonus || 0);
+        const total = summary.earned - (summary.overflowCut || 0) + summary.clearBonus + summary.leftoverBonus + (summary.greedBonus || 0);
         const overlay = document.createElement('div');
         overlay.className = `rg-arrival rg-grade-${grade.id}`;
         overlay.innerHTML = `
             <div class="rg-arrival-medal"><span>${grade.name}</span></div>
             <div class="rg-arrival-rows">
-                <div><span>水揚げ</span><strong data-to="${summary.earned}">0</strong></div>
+                <div><span>水揚げ${summary.overflowCut ? `（超過分は${Math.round(GAME_DATA.ROGUE_CONFIG.overflowMoneyRate * 100)}%）` : ''}</span><strong data-to="${summary.earned - (summary.overflowCut || 0)}">0</strong></div>
                 <div><span>クリアボーナス</span><strong data-to="${summary.clearBonus}">0</strong></div>
                 <div><span>余った餌 ×${summary.leftover}</span><strong data-to="${summary.leftoverBonus}">0</strong></div>
                 ${summary.greedBonus ? `<div><span>欲張り</span><strong data-to="${summary.greedBonus}">0</strong></div>` : ''}
@@ -230,7 +235,7 @@ const HarborUI = {
         return `
             <button class="rg-reward-card rg-tier-${skill.tier}" onclick="${onclick}">
                 <span class="material-icons rg-reward-icon">${this.skillIcon(skill)}</span>
-                <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span>
+                <span class="rg-tier-badge rg-tier-${skill.tier}">${this.tierText(skill.tier)}</span>
                 <span class="rg-reward-name">${skill.name}</span>
                 <span class="rg-reward-desc">${skill.description}</span>
                 ${this.synergyHtml(id)}
@@ -264,7 +269,7 @@ const HarborUI = {
                     onclick="HarborUI.onBuySkill(${index})" ${offer.sold ? 'disabled' : ''}>
                     <span class="material-icons rg-shop-icon rg-tier-${skill.tier}">${this.skillIcon(skill)}</span>
                     <span class="rg-shop-text">
-                        <span class="rg-shop-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span></span>
+                        <span class="rg-shop-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.tierText(skill.tier)}</span></span>
                         <span class="rg-shop-desc">${skill.description}</span>
                         ${offer.sold ? '' : this.synergyHtml(offer.id)}
                     </span>
@@ -322,7 +327,7 @@ const HarborUI = {
             </div>
             <div class="rg-shop-list">${skillRows}</div>
 
-            <h3 class="rg-section-title"><span class="material-icons">set_meal</span> 餌 <small>成功率は今のパワーでの目安。買った餌は持ち越せます</small></h3>
+            <h3 class="rg-section-title"><span class="material-icons">set_meal</span> 餌 <small>所持 ${GameState.getTotalBaitCount()} / ${RunManager.config.baitCarryCap}・成功率は今のパワーでの目安</small></h3>
             <div class="rg-card-row rg-cols-${Math.min(4, offers.length + (special ? 1 : 0))}">${baitTiles}${specialTile}</div>
             ${locked.length ? `<p class="rg-locked-line">${locked.join('、')}</p>` : ''}
 
@@ -464,8 +469,16 @@ const HarborUI = {
         if (ok) this.animateGain(skillId, from, before);
     },
     onReroll() { this._after(RunManager.rerollSkills()); },
-    onBuyBait(baitId) { this._after(RunManager.buyBait(baitId)); },
-    onBuySpecialBait() { this._after(RunManager.buySpecialBait()); },
+    onBuyBait(baitId) {
+        const offer = RunManager.getBaitOffers().find(o => o.id === baitId);
+        if (offer && RunManager.baitRoom() < offer.quantity) return this._after(false, `餌は${RunManager.config.baitCarryCap}個までしか持てません`);
+        this._after(RunManager.buyBait(baitId));
+    },
+    onBuySpecialBait() {
+        const offer = GameState.run.harbor.specialBait;
+        if (offer && RunManager.baitRoom() < offer.quantity) return this._after(false, `餌は${RunManager.config.baitCarryCap}個までしか持てません`);
+        this._after(RunManager.buySpecialBait());
+    },
     onUpgradeRod() { this._rodChange(RunManager.upgradeRod()); },
     onBuyRod(index) { this._rodChange(RunManager.buyNextRod(index)); },
 
@@ -568,7 +581,7 @@ const HarborUI = {
                 <h2><span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${this.skillIcon(skill)}</span> ${skill.name}</h2>
                 <button class="btn-close" onclick="HarborUI.closeModal('skill-modal')"><span class="material-icons">close</span></button>
             </div>
-            <p class="rg-skill-detail"><span class="rg-tier-badge rg-tier-${skill.tier}">Tier ${this.TIER_LABELS[skill.tier]}</span> ${family ? `系統：${family.name}` : ''} ・ ${isEquipped ? '装備中' : '控え'}</p>
+            <p class="rg-skill-detail"><span class="rg-tier-badge rg-tier-${skill.tier}">Tier ${this.tierText(skill.tier)}</span> ${family ? `系統：${family.name}` : ''} ・ ${isEquipped ? '装備中' : '控え'}</p>
             <p class="rg-skill-detail">${skill.description}</p>
             ${actions ? `<div class="rg-modal-actions">${actions}</div>` : ''}
         `);
@@ -714,7 +727,7 @@ const HarborUI = {
             <div class="shop-item">
                 <span class="material-icons rg-skill-icon rg-tier-${skill.tier}">${this.skillIcon(skill)}</span>
                 <div class="item-info">
-                    <div class="item-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.TIER_LABELS[skill.tier]}</span></div>
+                    <div class="item-name">${skill.name} <span class="rg-tier-badge rg-tier-${skill.tier}">${this.tierText(skill.tier)}</span></div>
                     <div class="item-desc">${skill.description}</div>
                 </div>
             </div>
