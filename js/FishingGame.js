@@ -98,7 +98,7 @@ const FishingGame = {
         // ========================================
         // 宝箱の抽選 (通常)
         // ========================================
-        const treasureChance = GAME_DATA.TREASURE_CONFIG.baseChance + GameState.getTreasureChanceBonus();
+        const treasureChance = Math.min(GAME_DATA.ROGUE_CONFIG.treasureChanceCap, GAME_DATA.TREASURE_CONFIG.baseChance + GameState.getTreasureChanceBonus());
         // ... (既存の宝箱ログ削除)
 
         if (Math.random() < treasureChance) {
@@ -371,8 +371,8 @@ const FishingGame = {
         // フィーバーモード (月) の場合: 称号出現率超アップ
         // ========================================
         if (GameState.fever.isActive && GameState.fever.type === 'moon') {
-            console.log('🔥 月フィーバー: 称号出現率超アップ！');
-            titleChanceMult *= 5.0; // さらに5倍 (合計最大15倍以上)
+            
+            titleChanceMult *= 2.0; // 原作は5倍。ローグライトでは2倍
         }
 
         if (Math.random() < GAME_DATA.TITLE_CONFIG.chance * titleChanceMult) {
@@ -855,30 +855,28 @@ const FishingGame = {
         return { id: 'reckless', label: '無謀' };
     },
 
-    // ゾーンごとの捕獲率（緑・白は範囲の平均値）
+    // パワー係数: 魚より強ければ1、弱いほど (比)^exponent で下がる
+    getPowerFactor(fish, power = GameState.getTotalPower()) {
+        const ratio = power / Math.max(1, fish.power);
+        return ratio >= 1 ? 1 : Math.pow(ratio, GAME_DATA.ROGUE_CONFIG.catchModel.exponent);
+    },
+
+    // ゾーンごとの捕獲率（緑・白は止めるたびのばらつきの平均）
     getZoneRates(fish, power = GameState.getTotalPower(), baitId = GameState.baitType) {
-        const zones = GAME_DATA.GAUGE_CONFIG.zones;
         const bonus = GameState.getCatchBonus();
-        const avg = z => (z.catchRate.min + z.catchRate.max) / 2;
         const clamp = v => Math.max(0, Math.min(1, v));
 
-        // 赤: 餌と魚のランク差とパワー差で決まる。緑+10ポイントを下限にする
-        const bait = GAME_DATA.BAITS.find(b => b.id === baitId) || GAME_DATA.BAITS[0];
-        const rankDiff = (this.RANK_INDEX[fish.rarity] || 0) - (this.RANK_INDEX[bait.rank] || 0);
-        let base = 0.9;
-        if (rankDiff === 1) base = 0.8;
-        else if (rankDiff === 2) base = 0.6;
-        else if (rankDiff >= 3) base = 0.4;
-        const powerPenalty = Math.max(0, fish.power - power) / Math.max(1, power) * 0.5;
-        let red = Math.max(base - powerPenalty, GAME_DATA.ROGUE_CONFIG.redZoneFloor);
-        red = Math.max(red, GameState.getPerfectCatchRate());
-        if (GameState.hasPerfectMaster && GameState.hasPerfectMaster()) red = 1.0;
+        // どのゾーンも「自分のパワー ÷ 魚のパワー」で下がる（足りないほど急に釣れなくなる）
+        const model = GAME_DATA.ROGUE_CONFIG.catchModel;
+        const factor = this.getPowerFactor(fish, power);
+        let red = model.base.red * factor + GameState.getPerfectCatchRate();
+        if (GameState.hasPerfectMaster && GameState.hasPerfectMaster()) red *= 1.5;
 
         const isSS = fish.rarity === 'SS';  // SSは赤ゾーン以外では釣れない
         return {
             red: clamp(red + bonus),
-            green: isSS ? 0 : clamp(avg(zones.green) + bonus),
-            white: isSS ? 0 : clamp(avg(zones.white) + bonus)
+            green: isSS ? 0 : clamp(model.base.green * factor + bonus),
+            white: isSS ? 0 : clamp(model.base.white * factor + bonus)
         };
     },
 
@@ -930,11 +928,10 @@ const FishingGame = {
         const power = GameState.getTotalPower();
         const rates = this.getZoneRates(this.currentFish, power);
         let catchRate = rates[zone];
-        if (zone !== 'red') {
-            // 緑・白は範囲内でばらつく
-            const z = GAME_DATA.GAUGE_CONFIG.zones[zone];
-            catchRate = Math.min(1, z.catchRate.min + Math.random() * (z.catchRate.max - z.catchRate.min) + GameState.getCatchBonus());
-            if (this.currentFish.rarity === 'SS') catchRate = 0;
+        if (zone !== 'red' && catchRate > 0) {
+            // 緑・白は止めるたびに少しばらつく
+            const spread = GAME_DATA.ROGUE_CONFIG.catchModel.spread[zone] || 0;
+            catchRate = Math.max(0, Math.min(1, catchRate + (Math.random() * 2 - 1) * spread));
         }
 
         // 逃げられたときに表示する理由
@@ -992,7 +989,7 @@ const FishingGame = {
         const feverResult = GameState.progressFever();
         UIManager.updateFeverVisuals();
         if (feverResult.message === 'start') {
-            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
+            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー1.5倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
         } else if (feverResult.message === 'end') {
             UIManager.showNotification('', 'フィーバー終了', 'cloud', 2000);
         }
@@ -1108,7 +1105,7 @@ const FishingGame = {
         const feverResult = GameState.progressFever(true);
         UIManager.updateFeverVisuals();
         if (feverResult.message === 'start') {
-            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
+            UIManager.showNotification('フィーバー開始！', `${feverResult.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${feverResult.type === 'sun' ? '宝箱が出やすい' : 'パワー1.5倍・大物が出やすい'}`, feverResult.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
         }
 
         if (!skipPenalty) {
@@ -1268,7 +1265,9 @@ const FishingGame = {
 
             // 個数 (量ボーナス)
             const baseCount = selectedBaitConfig.min + Math.floor(Math.random() * (selectedBaitConfig.max - selectedBaitConfig.min + 1));
-            const finalCount = Math.max(1, Math.floor(baseCount * quantityMult)); // 最低1個
+            // 持てる上限（30個）を超えた分は出ない。宝箱の餌で無限に釣り続けられるのを防ぐ
+            const room = typeof RunManager !== 'undefined' && GameState.run ? Math.max(0, RunManager.baitRoom()) : Infinity;
+            const finalCount = Math.min(room, Math.max(1, Math.floor(baseCount * quantityMult))); // 最低1個
 
             const baitData = GAME_DATA.BAITS.find(b => b.id === selectedBaitConfig.id);
 
@@ -1422,7 +1421,7 @@ const FishingGame = {
                 console.log('⚡ 漁船効果: フィーバーチャージ');
 
                 if (result.message === 'start') {
-                    UIManager.showNotification('フィーバー開始！', `${result.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${result.type === 'sun' ? '宝箱が出やすい' : 'パワー2倍・大物が出やすい'}`, result.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
+                    UIManager.showNotification('フィーバー開始！', `${result.type === 'sun' ? 'おたから' : 'おさかな'}フィーバー：${result.type === 'sun' ? '宝箱が出やすい' : 'パワー1.5倍・大物が出やすい'}`, result.type === 'sun' ? 'wb_sunny' : 'nightlight', 3000);
                 }
             }
 

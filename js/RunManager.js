@@ -259,6 +259,7 @@ const RunManager = {
         run.earned = 0;
         run.reached = false;
         run.combo = 0;
+        run.overflowCut = 0;
         run.chum = 0;
         run.roundCasts = 0;
         run.phase = 'fishing';
@@ -306,6 +307,7 @@ const RunManager = {
         const nushiDone = !run.nushi || run.nushi.caught;
         if (!run.reached && run.earned >= run.target && nushiDone) {
             run.reached = true;
+            UIManager.showMessage(`目標達成！ ここから先の売上は${Math.round(this.config.overflowMoneyRate * 100)}%が所持金になります`, 2600);
             SoundManager.play('goal');
             SaveManager.save();
             UIManager.updateStatus();
@@ -379,7 +381,7 @@ const RunManager = {
         // 商売4つ: 入れ替えが毎回1回無料
         const familyRerolls = GameState.getEffectsByType('family_free_reroll').reduce((a, e) => a + e.value, 0);
         run.harbor = {
-            summary: { earned: run.earned, target: run.target, grade: grade.id, clearBonus, leftover, leftoverBonus, greedBonus, isFinalClear },
+            summary: { earned: run.earned, target: run.target, grade: grade.id, clearBonus, leftover, leftoverBonus, greedBonus, overflowCut: run.overflowCut || 0, isFinalClear },
             rewardTaken: false,
             rewardOptions: this.pickSkills(rewardCount, run.round + 1, [], grade.tierUp),
             shopSkills: [],
@@ -638,6 +640,7 @@ const RunManager = {
         if (!this._inHarbor()) return false;
         const offer = this.run.harbor.specialBait;
         if (!offer || offer.sold) return false;
+        if (this.baitRoom() < offer.quantity) return false;
         if (!GameState.spendMoney(this.getSpecialBaitPrice())) return false;
         GameState.addBait(offer.id, offer.quantity);
         offer.sold = true;
@@ -684,10 +687,16 @@ const RunManager = {
         this.restockSkills();
         return this._commit();
     },
+    // 餌を持てる上限まで、あと何個買えるか
+    baitRoom() {
+        return this.config.baitCarryCap - GameState.getTotalBaitCount();
+    },
+
     buyBait(baitId) {
         if (!this._inHarbor()) return false;
         const item = this.getBaitOffers().find(offer => offer.id === baitId);
         if (!item || item.stock <= 0) return false;
+        if (this.baitRoom() < item.quantity) return false;
         if (!GameState.spendMoney(item.price)) return false;
 
         GameState.addBait(baitId, item.quantity);

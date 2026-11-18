@@ -2215,3 +2215,34 @@ body[data-screen="harbor"] .rg-tip {
     font-weight: 700;
     background: #bae6fd;
 }
+
+/* Tier の札は角を少しだけ丸める（丸だと情報マークに見える） */
+.rg-tier-badge {
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+}
+
+/* 系統チップ: 系統名は折り返さない */
+.rg-family-chip {
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.rg-family-chip small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 釣り場カード: 狭い画面で名前と目標額が折り返さないように */
+@media (max-width: 480px) {
+    .rg-area-card .rg-area-name {
+        font-size: 13px;
+        line-height: 1.25;
+    }
+
+    .rg-area-target {
+        font-size: 13px;
+        white-space: nowrap;
+    }
+}

@@ -998,7 +998,7 @@ const FUELS = [
 const ROGUE_CONFIG = {
     // --- ラウンド ---
     finalRound: 10,                 // このラウンドをクリアすると航海達成（以降はエンドレス）
-    targets: [100, 300, 800, 2000, 4500, 9000, 16000, 26000, 38000, 52000], // 各ラウンドの目標水揚げ額(G)
+    targets: [80, 150, 650, 2000, 5000, 11000, 20000, 30000, 40000, 65000], // 各ラウンドの目標水揚げ額(G)
     endlessGrowth: 1.3,             // 最終ラウンド以降の目標の伸び率
     baitPerRound: 10,               // 毎ラウンド支給される餌の数
     // 支給される餌のランク（from 以降のラウンドで適用。後ろの定義が優先）
@@ -1025,10 +1025,25 @@ const ROGUE_CONFIG = {
     combo: { step: 0.1, maxStacks: 5 },  // 1連続ごとに売値+10%、最大+50%
 
     // --- 釣り上げ判定 ---
-    redZoneFloor: 0.6,              // 赤ゾーンの捕獲率の下限（緑ゾーンの平均+10ポイント）
+    // ゲージで止めたときの捕獲率（ローグライト版の判定）
+    //   捕獲率 = base × パワー係数 + キャッチ率UP。パワー係数 = (自分のパワー ÷ 魚のパワー)^exponent（1以上は1）
+    //   原作の「緑は常に4〜6割」「赤の下限6割」だとパワーが足りなくても釣れてしまい、竿を強くする意味がなかった
+    catchModel: {
+        base: { red: 0.95, green: 0.6, white: 0.2 },
+        spread: { green: 0.1, white: 0.05 },   // 緑・白は止めるたびにこの幅でばらつく
+        exponent: 1.6
+    },
+    moonFeverPower: 1.5,            // おさかなフィーバー中のパワー倍率（原作は2倍。パワーで捕獲率が決まるので抑える）
+    countSkillCap: 20,              // マナの共鳴が数える所持スキル数の上限
+    titlePriceMult: 3,              // 称号付きの売値倍率（原作10倍）
+    baitPrices: { bait_c: 150, bait_b: 600, bait_a: 2000, bait_s: 6000 }, // 5個セットの値段（原作 50/200/800/3000）
+    rarityPriceScale: { A: 0.7, S: 0.35, SS: 0.3 }, // ランク別の売値倍率（読み込み時に FISH へ反映）
+    overflowMoneyRate: 0.4,         // 目標額を超えた水揚げのうち、所持金になる割合（水揚げ額と評価には全額数える）
+    baitCarryCap: 30,               // 買える餌の合計の上限（支給餌は別）。持ち越しすぎて餌の制限がなくなるのを防ぐ
 
     // --- 宝箱のお金（目標額に対する割合。最小〜最大） ---
-    treasureMoneyRate: { WOOD: [0.10, 0.20], SILVER: [0.25, 0.40], GOLD: [0.60, 1.00] },
+    treasureChanceCap: 0.35,        // 宝箱の出現率の上限（スキルを重ねても35%まで）
+    treasureMoneyRate: { WOOD: [0.03, 0.05], SILVER: [0.06, 0.10], GOLD: [0.20, 0.30] }, // 目標額に対する割合。たからフィーバーは毎投宝箱なので、1回のフィーバーで目標の9割前後
 
     // --- スキル ---
     baseSkillSlots: 2,
@@ -1083,6 +1098,12 @@ const ROGUE_CONFIG = {
         catch_rate_2: { description: '捕獲確率+10%', effect: { type: 'catch_boost', value: 0.1 } },
         catch_rate_3: { description: '捕獲確率+20%', effect: { type: 'catch_boost', value: 0.2 } },
         catch_rate_4: { description: '捕獲確率+30%', effect: { type: 'catch_boost', value: 0.3 } },
+        // 達人の針: パワーと無関係に100%だと桁違いに稼げてしまうので「赤ゾーンの捕獲率+」にする
+        perfect_master_1: { description: '赤ゾーンで止めたときの捕獲率+10%', effect: { type: 'perfect_catch', value: 0.1 } },
+        perfect_master_2: { description: '赤ゾーンで止めたときの捕獲率+15%', effect: { type: 'perfect_catch', value: 0.15 } },
+        perfect_master_3: { description: '赤ゾーンで止めたときの捕獲率+20%', effect: { type: 'perfect_catch', value: 0.2 } },
+        perfect_master_4: { description: '赤ゾーンで止めたときの捕獲率+30% & 赤ゾーン幅+40%', effect: { type: 'perfect_catch', value: 0.3, extraRedZone: 0.4 } },
+        master_needle: { description: '赤ゾーンで止めたときの捕獲率1.5倍（上限100%）' },
         // 早打ち: 餌の数で区切るローグライト版では待ち時間短縮に価値がないので、
         // 「売値が下がる代わりにパワーが上がる」取引にする（待ち時間短縮も残す）
         // 船乗りの勘: I〜III の上がり幅が小さく実感できなかったので引き上げる（極は+30%のまま）
@@ -1138,13 +1159,16 @@ const ROGUE_CONFIG = {
     rodOfferChoices: 2,             // 釣り宿の竿の棚に並ぶ、次の素材の竿の数
 
     // --- 竿（ローグライト版の価格表。原作の RODS.price / upgradeCosts は使わない） ---
-    rodPrices: [0, 500, 2000, 6000, 18000],
+    rodPrices: [0, 400, 2500, 9000, 30000],
+    // 竿の基本パワー。原作のままだと「木の竿★5（25）」より「竹の竿★0（22）」が弱く、買い替えると弱くなっていた。
+    // 新しい素材の竿は、ひとつ前の竿を星5まで上げたより少し強くする
+    rodBasePower: [10, 28, 56, 100, 165],
     rodUpgradeCosts: [
         [40, 80, 120, 180, 260],
-        [150, 250, 350, 500, 700],
-        [500, 800, 1100, 1500, 2000],
-        [1500, 2200, 3000, 4000, 5500],
-        [4000, 6000, 8000, 11000, 15000]
+        [200, 300, 450, 650, 900],
+        [900, 1300, 1800, 2400, 3200],
+        [3000, 4200, 5600, 7200, 9000],
+        [9000, 12000, 16000, 21000, 27000]
     ],
 
     // ラウンドごとの空（海域に空の指定がないときに使う）
@@ -1244,7 +1268,7 @@ const ROGUE_CONFIG = {
         fromCast: 6,               // 何投目からかかり始めるか（逃げられても次の一投でまたかかる）
         phases: 3,                 // ゲージバトルの連戦数（勝った分は逃げられても残る＝ヌシの体力）
         speedStep: 0.15,           // 連戦ごとのゲージ速度の上昇
-        powerMult: 1.5,            // ヌシは元の魚よりパワーが高い
+        powerMult: 1.2,            // ヌシは元の魚よりパワーが高い
         priceMult: 3,              // 売値（称号付きの10倍だと目標額を1匹で超えてしまうので抑える）
         rewardChoices: 3           // 釣ると特別スキルを3択から1つ
     },
@@ -1351,6 +1375,21 @@ const ROGUE_SKILLS = [
     { id: 'treasure_momentum_3', name: '宝の勢い III', description: '宝箱を開けると、次の一投の売値+75%', effect: { type: 'treasure_momentum', value: 0.75 }, price: 0, tier: 3, group: 'ローグ', icon: 'card_giftcard' },
 ];
 ROGUE_SKILLS.forEach(s => SKILLS.push(s));
+
+// 竿の基本パワーをローグライト版の値にする
+// 称号付きの売値: 原作の10倍だと1匹で目標を何倍も超えるので、ローグライトでは3倍
+TITLE_CONFIG.priceMultiplier = ROGUE_CONFIG.titlePriceMult;
+
+// 餌の値段は原作のまま（売値の1/5〜1/8）だと買うほど儲かるので、ローグライト用に上げる
+Object.entries(ROGUE_CONFIG.baitPrices).forEach(([id, price]) => {
+    const bait = BAITS.find(b => b.id === id);
+    if (bait) bait.price = price;
+});
+// 上位ランクの売値は原作の長期育成向け（S1匹で数ラウンド分）なので、ローグライトでは圧縮する
+Object.entries(ROGUE_CONFIG.rarityPriceScale).forEach(([rarity, scale]) => {
+    FISH.forEach(fish => { if (fish.rarity === rarity) fish.price = Math.max(1, Math.round(fish.price * scale / 10) * 10); });
+});
+ROGUE_CONFIG.rodBasePower.forEach((power, i) => { if (RODS[i]) RODS[i].basePower = power; });
 
 // 調整したスキルを上書きする
 Object.entries(ROGUE_CONFIG.skillOverrides).forEach(([id, patch]) => {
